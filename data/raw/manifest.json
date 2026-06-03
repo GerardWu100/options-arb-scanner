@@ -1,0 +1,43 @@
+{
+  "dataset_version": 1,
+  "source": {
+    "system": "synthetic_local_generation",
+    "query_description": "Deterministic synthetic SPY end-of-day options and underlying closes generated for offline portability when ClickHouse credentials are unavailable.",
+    "notes": "One symbol (SPY), expiries 15/30/45/60 calendar days, five moneyness levels, both call and put rows."
+  },
+  "symbols": [
+    "SPY"
+  ],
+  "date_coverage": {
+    "start": "2024-01-02",
+    "end": "2025-12-31"
+  },
+  "files": {
+    "options_quotes.parquet": {
+      "rows": 20880,
+      "columns": [
+        "symbol",
+        "trade_date",
+        "expiry_date",
+        "option_type",
+        "strike_price",
+        "bid",
+        "ask",
+        "bid_iv",
+        "ask_iv",
+        "open_interest",
+        "volume"
+      ],
+      "compression": "zstd"
+    },
+    "underlying_daily.parquet": {
+      "rows": 522,
+      "columns": [
+        "symbol",
+        "trade_date",
+        "close"
+      ],
+      "compression": "zstd"
+    }
+  }
+}

@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "options-rv"
+version = "0.1.0"
+description = "Offline options to realized variance research pipeline"
+requires-python = ">=3.13"
+dependencies = [
+  "clickhouse-connect>=0.8.0",
+  "ipykernel>=6.29.0",
+  "nbconvert>=7.16.0",
+  "matplotlib>=3.10.0",
+  "nbclient>=0.10.0",
+  "nbformat>=5.10.0",
+  "numpy>=2.2.0",
+  "pandas>=2.2.0",
+  "pyarrow>=19.0.0",
+  "scikit-learn>=1.6.0",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3.0",
+]
+
+[project.scripts]
+options-rv = "options_rv.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,1 @@
+7. **Static Arbitrage Scanner for Options Chains** — “Automatically flag butterfly/calendar arbitrage violations and bad quotes, with a ‘red/yellow/green’ daily report and drill-down UI.” citeturn1search11

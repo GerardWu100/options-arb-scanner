@@ -1,0 +1,14 @@
+# Runtime configuration for the offline options RV pipeline.
+[runtime]
+
+# Directory with committed raw Parquet files and manifest metadata.
+raw_dir = "data/raw"
+
+# Underlying symbol to analyze. Allowed values in this project: "SPY".
+symbol = "SPY"
+
+# Forecast horizon in trading days for forward realized variance.
+horizon_days = 5
+
+# Annualization factor for daily variance. Standard convention uses 252.
+annualization_factor = 252
