@@ -175,3 +175,12 @@ They do not establish market predictability. A live study still needs exchange-s
 Forecast comparisons also need uncertainty estimates that respect overlapping horizons. A Diebold-Mariano test, introduced by [Diebold and Mariano (1995)](https://doi.org/10.1080/07350015.1995.10524599), would require an overlap-aware long-run variance estimate here. Economic value would require a specified variance trade and all execution costs.
 
 The corrected conclusion is narrow and useful: this repository is now a cleaner variance-forecasting scaffold. Its synthetic benchmark result says persistence wins this fixture. It says nothing yet about arbitrage or a tradeable edge.
+
+## References
+
+- Andersen, T. G., Bollerslev, T., Diebold, F. X., and Labys, P. (2003), [“Modeling and Forecasting Realized Volatility”](https://doi.org/10.1111/1468-0262.00418), *Econometrica* 71(2), 579–625.
+- Cboe Global Indices, [*VIX Index Methodology*](https://cdn.cboe.com/api/global/us_indices/governance/VIX_Methodology.pdf).
+- Davis, M. H. A., and Hobson, D. G. (2007), [“The Range of Traded Option Prices”](https://doi.org/10.1111/j.1467-9965.2007.00291.x), *Mathematical Finance* 17(1), 1–14.
+- Diebold, F. X., and Mariano, R. S. (1995), [“Comparing Predictive Accuracy”](https://doi.org/10.1080/07350015.1995.10524599), *Journal of Business & Economic Statistics* 13(3), 253–263.
+- Hoerl, A. E., and Kennard, R. W. (1970), [“Ridge Regression: Biased Estimation for Nonorthogonal Problems”](https://doi.org/10.1080/00401706.1970.10488634), *Technometrics* 12(1), 55–67.
+- Patton, A. J. (2011), [“Volatility Forecast Comparison Using Imperfect Volatility Proxies”](https://doi.org/10.1016/j.jeconom.2010.03.034), *Journal of Econometrics* 160(1), 246–256.
