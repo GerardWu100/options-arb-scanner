@@ -3,7 +3,7 @@
 ## Project scan summary
 
 - Project archetype candidate: mixed `risk-model` and `data-pipeline`, with the risk-model blueprint dominant.
-- Supporting evidence from files: `realized_variance.py` defines a five-trading-day forward variance target without same-day leakage; `option_surface.py` reduces each end-of-day chain to six explainable features; `offline_research.py` compares persistence, at-the-money implied variance, and ridge regression using chronological splits. The committed manifest identifies the inputs as deterministic synthetic data, so this is a pipeline demonstration rather than market evidence.
+- Supporting evidence from files: `realized_variance.py` now aligns a five-trading-day target strictly after the feature date; `option_surface.py` validates quotes and reduces each chain to six explainable features; `offline_research.py` compares persistence, at-the-money implied variance, and ridge regression using purged chronological splits. The audit found and corrected an off-by-one label defect. The committed manifest identifies deterministic synthetic inputs, so this is a pipeline demonstration rather than market evidence.
 
 ## Blueprint selection
 
@@ -13,9 +13,10 @@
   1. The question hidden behind the repository name
   2. Define the five-day forward target
   3. Compress an option chain into six daily features
-  4. Make the comparison difficult to cheat
-  5. What the synthetic run says, and what it cannot say
-  6. What would need to change for a real study
+  4. Distinguish quote validity from static no-arbitrage
+  5. Compare benchmarks and ridge on a purged clock
+  6. What the corrected synthetic run says
+  7. What would need to change for a real study
 
 ## Planned equations
 
@@ -34,6 +35,10 @@
 4. Ridge objective and QLIKE loss:
    - Purpose: distinguish the log-variance training objective from variance-level evaluation.
    - Symbols: $y_t$ is log forward variance, $x_t$ is the standardized feature vector, $\beta$ is the coefficient vector, $\alpha=1$ is the penalty, $v_t$ is realized variance, and $f_t>0$ is forecast variance.
+   - Delimiter: display.
+5. Static no-arbitrage conditions:
+   - Purpose: show why filtering crossed individual quotes does not make this an arbitrage scanner.
+   - Symbols: $C(K)$ and $P(K)$ are European call and put prices at strike $K$; $r$ is the risk-free rate, $q$ is dividend yield, and $\tau$ is time to expiry.
    - Delimiter: display.
 
 ## Planned code excerpts
@@ -57,6 +62,6 @@
 ## Risks, gaps, and assumptions
 
 - Data gaps: the committed sample is synthetic, contains one symbol, and is not suitable for claims about live option markets or forecast profitability.
-- Assumptions: implied volatilities are decimal annualized volatilities, variance predictions must stay positive for QLIKE, and the split proportions are 60% train, 20% validation, and 20% test.
+- Assumptions: implied volatilities are decimal annualized volatilities, variance predictions must stay positive for QLIKE, split proportions are 60% train, 20% validation, and 20% test before purging, and a 30-day risk-neutral variance proxy is compared with a five-day physical realized-variance target.
 - Validation checks to run before final draft: execute all tests; rerun the command-line pipeline; confirm row counts and split dates; regenerate both charts; verify every Markdown image path; run the blog validator on English and French files.
 - Workspace and deployment: canonical materials remain in `options-arb-scanner/blog/`. Per the user's instruction, there is no publish bundle, Hugo build, website commit, or deployment in this task. Only the current project repository will be committed and pushed.

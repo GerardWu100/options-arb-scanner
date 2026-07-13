@@ -108,7 +108,12 @@ def run_offline_research(
         subset=FEATURE_COLUMNS + [target_level_column, target_log_column]
     ).reset_index(drop=True)
 
-    split_labels = build_chronological_split_masks(frame=panel_frame)
+    # A horizon-length purge prevents adjacent split labels from sharing future
+    # returns. For h=5, the last five train and validation rows are excluded.
+    split_labels = build_chronological_split_masks(
+        frame=panel_frame,
+        purge_gap_rows=horizon_days,
+    )
 
     persistence_prediction = compute_persistence_baseline(panel_frame)
     atm_iv_prediction = compute_atm_iv_baseline(panel_frame)

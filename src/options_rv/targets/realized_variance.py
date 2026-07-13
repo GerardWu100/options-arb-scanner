@@ -72,15 +72,17 @@ def build_forward_realized_variance_target(
     )
     frame["squared_log_return"] = frame["log_return"] ** 2
 
-    # Forward window starts at t+1 so the label at t does not use same-day return.
+    # First form a trailing h-return sum ending at each row, then move that sum
+    # back by h rows. The value aligned to date t therefore contains returns
+    # ending on t+1 through t+h, never the return ending on t.
     forward_sum_squared_returns = frame.groupby("symbol")[
         "squared_log_return"
     ].transform(
-        lambda series: (
-            series.shift(-1)
-            .rolling(window=horizon_days, min_periods=horizon_days)
-            .sum()
+        lambda series: series.rolling(
+            window=horizon_days, min_periods=horizon_days
         )
+        .sum()
+        .shift(-horizon_days)
     )
     trailing_sum_squared_returns = frame.groupby("symbol")[
         "squared_log_return"

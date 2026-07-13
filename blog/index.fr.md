@@ -1,6 +1,6 @@
 ---
 title: "Une surface d'options peut-elle prévoir la variance réalisée ?"
-description: "Une expérience hors ligne sur SPY, sans fuite temporelle, avec des variables de surface, des benchmarks simples et un résultat qui refuse de flatter le modèle."
+description: "Un audit d'une expérience de prévision de variance sur SPY : alignement corrigé, évaluation purgée, logique de surface et victoire de la persistance sur données synthétiques."
 date: 2026-07-13
 image: images/cover-options-rv.png
 categories: ["Quantitative Research", "Risk Management"]
@@ -8,131 +8,170 @@ categories: ["Quantitative Research", "Risk Management"]
 
 # Une surface d'options peut-elle prévoir la variance réalisée ?
 
-Le dépôt s'appelle `options-arb-scanner`, mais le code actuel ne cherche plus d'arbitrages. Il pose une question plus étroite : quelques variables tirées de la surface d'options en fin de journée permettent-elles de prévoir la variance réalisée de SPY sur les cinq séances suivantes ?
+Le dépôt s'appelle `options-arb-scanner`, mais son code actuel ne recherche pas d'arbitrage. Il résume une chaîne d'options SPY de fin de séance en six variables, puis cherche à prévoir la variance réalisée annualisée des cinq séances suivantes.
 
-La nuance n'est pas anodine. Pour parler d'arbitrage, il faudrait des prix exécutables, des règles d'exécution et la preuve que le gain apparent résiste aux frais. Rien de tout cela n'est modélisé ici. Le projet construit plutôt une expérience de prévision supervisée avec un contrat de données hors ligne, une évaluation chronologique, deux benchmarks simples et une régression ridge. C'est bien cette expérience, telle qu'elle existe dans le code, qui m'intéresse ici.
+Ce sont deux sujets de recherche distincts. Un scanner de valeur relative confronte des prix d'options exécutables à des relations d'absence d'arbitrage ou à un modèle de valorisation, puis tient compte des coûts de transaction et de la couverture. Ici, le modèle produit une prévision statistique de variance. Il ne propose ni trade ni profit garanti.
 
-Une autre réserve doit être posée tout de suite. Le jeu de données versionné est déterministe et synthétique. Il contient 522 jours ouvrés entre le 2 janvier 2024 et le 31 décembre 2025, ainsi que 20 880 cotations d'options. Chaque date comprend quatre échéances, cinq niveaux de moneyness, des calls et des puts. C'est suffisant pour rendre le pipeline portable et testable, mais pas pour tirer une conclusion sur le marché réel des options SPY.
+La différence s'est révélée plus que rédactionnelle lors d'un second audit. La première version de la cible comportait un décalage d'un jour : la fenêtre glissante pouvait inclure le rendement se terminant à la date des variables. Le test unitaire, construit avec des rendements constants, ne pouvait pas repérer l'erreur puisque toutes les fenêtres avaient la même valeur. Un calcul manuel avec des rendements différents l'a mise en évidence. Le pipeline corrigé purge aussi les cibles qui se chevauchent aux frontières des échantillons et écarte les cotations individuellement invalides.
 
 ![Une surface d'options stylisée qui se prolonge en prévision incertaine de variance réalisée](images/cover-options-rv.png)
 
-L'image résume la compression au cœur du pipeline : une surface d'options observée aujourd'hui devient une prévision unique, portant sur une quantité qui ne sera connue qu'après cinq séances supplémentaires.
+L'échantillon versionné contient 522 jours ouvrés du 2 janvier 2024 au 31 décembre 2025 et 20 880 cotations d'options synthétiques. Il s'agit de données de test déterministes. Les résultats ci-dessous testent le pipeline de recherche, pas le marché réel des options SPY.
 
-## Une cible qui ne voit pas le présent
+## Définir la quantité avant de la prévoir
 
-Notons $S_t$ le cours de clôture de SPY à la date de négociation $t$. Le rendement logarithmique quotidien $r_t$, mesuré de $t-1$ à $t$, vaut
+Notons $S_t$ le cours de clôture de SPY à la date de négociation $t$. Le rendement logarithmique de clôture à clôture qui se termine en $t$ est $r_t$ :
 
 $$
 r_t = \ln\left(\frac{S_t}{S_{t-1}}\right).
 $$
 
-L'horizon de prévision est $h=5$ séances et le facteur d'annualisation est $A=252$ séances par an. La variance réalisée future annualisée rattachée à la date $t$ est
+Notons $h=5$ l'horizon de prévision en séances et $A=252$ le facteur d'annualisation en séances par an. La variance réalisée future non annualisée, connue après la date $t+h$, vaut
 
 $$
-RV^{(A)}_{t,t+h} = \frac{A}{h}\sum_{i=1}^{h}r_{t+i}^{2}.
+RV_{t,t+h} = \sum_{i=1}^{h}r_{t+i}^{2}.
 $$
 
-Tous les rendements de cette somme se produisent après la date $t$. Le premier est $r_{t+1}$, et non $r_t$. Ce petit décalage d'indice porte une bonne partie de la crédibilité de l'étude : une variable observée à la clôture de $t$ ne doit pas être évaluée sur une cible qui contient déjà le rendement se terminant à cette même clôture.
+Multiplier la moyenne quotidienne des rendements au carré par $A$ donne la cible annualisée :
 
-L'implémentation effectue explicitement ce décalage avant la fenêtre glissante :
+$$
+RV^{(A)}_{t,t+h}
+= A\left(\frac{1}{h}\sum_{i=1}^{h}r_{t+i}^{2}\right)
+= \frac{A}{h}RV_{t,t+h}.
+$$
+
+Chaque rendement de cette cible se termine après $t$. L'implémentation forme maintenant une somme glissante complète, puis la recule de $h$ lignes :
 
 ```python
 forward_sum_squared_returns = frame.groupby("symbol")[
     "squared_log_return"
 ].transform(
-    lambda series: (
-        series.shift(-1)
-        .rolling(window=horizon_days, min_periods=horizon_days)
-        .sum()
+    lambda series: series.rolling(
+        window=horizon_days, min_periods=horizon_days
     )
+    .sum()
+    .shift(-horizon_days)
 )
 ```
 
-Le modèle apprend $\ln(RV^{(A)}_{t,t+h})$ plutôt que la variance en niveau. Le logarithme limite le poids des grandes observations de variance et, après exponentiation, garantit des prévisions positives. Les métriques restent calculées en niveau de variance, une échelle plus facile à interpréter.
+Prenons un calcul manuel sur deux jours. Supposons que les rendements se terminant aux dates 1 à 4 soient $0.01$, $0.02$, $0.03$ et $0.04$. La cible à la date 0 doit utiliser $0.01^2+0.02^2$. Celle de la date 1 doit utiliser $0.02^2+0.03^2$. Le nouveau test unitaire vérifie ces deux valeurs. Une suite constante ne peut pas déceler ce type d'erreur d'indexation.
 
-## Résumer toute la chaîne en six nombres
+Cette définition s'inscrit dans les travaux sur la variance réalisée, même si le projet emploie des rendements quotidiens plutôt qu'intrajournaliers. [Andersen, Bollerslev, Diebold et Labys (2003)](https://doi.org/10.1111/1468-0262.00418) fournissent les fondements empiriques de la modélisation et de la prévision de la volatilité réalisée.
 
-Une chaîne d'options n'est pas naturellement un tableau rectangulaire prêt pour le machine learning. Les grilles de strikes et les dates d'échéance changent, et plusieurs cotations peuvent se trouver à distance comparable du point recherché sur la surface. Le constructeur de variables tranche avec les mêmes règles déterministes pour chaque paire symbole-date.
+## Transformer une chaîne irrégulière en six variables quotidiennes
 
-Pour une cotation dont les volatilités implicites bid et ask sont respectivement $\sigma^{bid}$ et $\sigma^{ask}$, la volatilité implicite médiane est
+Pour chaque option, notons $b$ le prix bid et $a$ le prix ask. Notons $\sigma^{bid}$ et $\sigma^{ask}$ les volatilités implicites obtenues à partir de ces deux prix. Le code définit les prix et volatilités médians par
 
 $$
-\sigma^{mid} = \frac{\sigma^{bid}+\sigma^{ask}}{2}.
+m = \frac{a+b}{2}, \qquad
+\sigma^{mid} = \frac{\sigma^{ask}+\sigma^{bid}}{2}.
 $$
 
-Le code retient l'échéance disponible la plus proche de 30 jours calendaires, puis celle qui se trouve au plus près de 60 jours. Dans chaque tranche, la cotation at-the-money (ATM) est celle dont la valeur absolue de la log-moneyness est la plus faible. La log-moneyness vaut $\ln(K/S_t)$, où $K$ désigne le strike. Si $\sigma_{30}$ et $\sigma_{60}$ sont les deux volatilités ATM médianes, la pente de terme vaut
+Avant de construire un point de surface, le pipeline retire les marchés croisés ($a<b$), les prix médians ou strikes non positifs, les bornes de volatilité implicite non positives ou inversées, les types d'options inconnus et les volumes ou open interest négatifs. Lorsqu'un call et un put partagent le strike at-the-money (ATM) le plus proche, le code moyenne leurs volatilités implicites médianes. L'ordre des lignes ne peut donc pas modifier la variable.
+
+L'échéance la plus proche de 30 jours calendaires fournit le point court. Celle qui se trouve au plus près de 60 jours fournit le point long. Notons $K$ le strike. La log-moneyness vaut $\ln(K/S_t)$, donc le strike ATM minimise $|\ln(K/S_t)|$. Si $\sigma_{30}$ et $\sigma_{60}$ sont les volatilités ATM médianes retenues, alors
 
 $$
 \text{term slope}_t = \sigma_{60}-\sigma_{30}.
 $$
 
-Pour le downside skew, le code travaille avec les puts proches de 30 jours. Notons $\sigma_{30}^{put,down}$ la volatilité implicite médiane du strike le plus proche situé strictement sous le spot, et $\sigma_{30}^{put,ATM}$ celle du put ATM. On obtient
+Pour le downside skew, notons $\sigma_{30}^{put,down}$ la volatilité implicite médiane du put dont le strike est le plus proche mais strictement inférieur au spot, et $\sigma_{30}^{put,ATM}$ celle du put ATM. On obtient
 
 $$
-\text{downside skew}_t = \sigma_{30}^{put,down}-\sigma_{30}^{put,ATM}.
+\text{downside skew}_t
+= \sigma_{30}^{put,down}-\sigma_{30}^{put,ATM}.
 $$
 
-Le signe se lit directement : une valeur positive indique que le put sous le spot porte davantage de volatilité implicite que le put ATM.
+Une valeur positive indique que le put sous le spot porte une volatilité implicite supérieure à celle du put ATM. Le vecteur complet contient la volatilité implicite ATM à 30 jours, la pente 60 moins 30 jours, le downside skew, le spread bid-ask relatif moyen $(a-b)/m$, l'open interest total et la variance réalisée annualisée des 20 jours précédents.
 
-Quatre variables proviennent des options : la volatilité implicite ATM à 30 jours, la pente 60 moins 30 jours, le downside skew à 30 jours et le spread bid-ask moyen divisé par le prix médian. L'open interest total forme une cinquième variable. La variance réalisée annualisée sur les 20 jours passés complète le vecteur et donne à la régression la même information récente que celle utilisée par le benchmark de persistance.
+La sélection par strike et échéance les plus proches reste facile à inspecter, mais rudimentaire. Une étude de marché interpolerait la variance implicite totale $\sigma^2\tau$, où $\tau$ désigne le temps jusqu'à l'échéance en années, à des maturités fixes. Elle calculerait aussi le skew à delta fixe. La [méthodologie du VIX de Cboe](https://cdn.cboe.com/api/global/us_indices/governance/VIX_Methodology.pdf) présente une mesure de variance à maturité constante, sans modèle et construite sur plusieurs strikes d'options SPX. Ce projet utilise des options SPY, et élever une seule volatilité ATM au carré n'est pas le calcul du VIX.
 
-Choisir l'échéance la plus proche reste une convention simple, pas une interpolation. Dans une étude destinée à la production, j'interpolerais plutôt la variance implicite totale à maturité fixe et je définirais les points de skew par delta, plutôt que par strike voisin. Ici, la priorité va à une règle facile à inspecter et parfaitement reproductible.
+## Valider une cotation ne suffit pas à prouver l'absence d'arbitrage
 
-## Des benchmarks que le modèle doit mériter de battre
+Les nouveaux filtres vérifient qu'un enregistrement isolé est exploitable. Ils ne garantissent pas l'absence d'arbitrage statique sur la surface.
 
-Le premier benchmark est la persistance : la variance annualisée des 20 derniers jours sert de prévision pour les cinq jours à venir. Le second élève au carré la volatilité implicite ATM à 30 jours, ce qui convertit une volatilité annualisée en variance.
-
-Le modèle principal est une régression ridge. Notons $x_t$ le vecteur des six variables standardisées à la date $t$, $y_t=\ln(RV^{(A)}_{t,t+5})$, $\beta$ le vecteur de coefficients et $\alpha=1$ le poids fixe de la pénalité. Pour $n$ observations d'entraînement, les coefficients minimisent
+Pour des calls européens de même échéance, notons $C(K)$ le prix du call en fonction du strike $K$. Si $K_1<K_2$, l'absence d'arbitrage par spread vertical impose
 
 $$
-\sum_{t=1}^{n}\left(y_t-x_t^{\mathsf{T}}\beta\right)^2
+C(K_1) \geq C(K_2).
+$$
+
+Pour trois strikes équidistants $K_1<K_2<K_3$, l'absence d'arbitrage par butterfly impose la convexité :
+
+$$
+C(K_1)-2C(K_2)+C(K_3) \geq 0.
+$$
+
+Notons $P(K)$ le prix du put correspondant, $r$ le taux sans risque en capitalisation continue, $q$ le rendement continu du dividende et $\tau$ le temps jusqu'à l'échéance en années. La parité put-call européenne impose
+
+$$
+C(K)-P(K)=S_t e^{-q\tau}-K e^{-r\tau}.
+$$
+
+Le pipeline ne vérifie aucune de ces relations entre cotations. Les équations ci-dessus concernent des options européennes, alors que les options SPY cotées permettent un exercice anticipé de style américain. Un scanner réel devrait donc employer les bornes adaptées à ce droit d'exercice. Le projet ne renseigne pas le style d'exercice. Il ne dispose pas non plus des tailles exécutables, frais, glissement de couverture, contraintes d'emprunt ni d'horodatages synchronisés. [Davis et Hobson (2007)](https://doi.org/10.1111/j.1467-9965.2007.00291.x) étudient les bornes des prix d'options et la logique d'arbitrage qui les sous-tend. Qualifier ce code de scanner d'arbitrage exagérerait sa portée.
+
+## Benchmarks, ridge et chronologie purgée
+
+Le benchmark de persistance prévoit la variance annualisée sur cinq jours avec la variance annualisée des 20 jours passés. Le benchmark d'options élève au carré la volatilité implicite ATM à 30 jours :
+
+$$
+f_t^{IV}=\sigma_{30,t}^{2}.
+$$
+
+$f_t^{IV}$ et $RV^{(A)}_{t,t+5}$ sont tous deux des variances annualisées. Aucun facteur supplémentaire de $5/252$ n'est requis. Des unités identiques masquent toutefois une hypothèse économique forte : la variance implicite risque-neutre à 30 jours doit approximer l'espérance physique de variance à cinq jours. L'écart de maturité et la prime de risque de variance peuvent rompre ce lien, même avec des données parfaites.
+
+Le modèle principal est une régression ridge. Notons $x_t$ les six variables standardisées, $y_t=\ln(RV^{(A)}_{t,t+5})$, $b$ l'ordonnée à l'origine, $\beta$ les six coefficients, $n$ le nombre d'observations d'entraînement et $\alpha=1$ le poids de la pénalité. Les paramètres ajustés minimisent
+
+$$
+\sum_{t=1}^{n}\left(y_t-b-x_t^{\mathsf{T}}\beta\right)^2
 +\alpha\sum_{j=1}^{6}\beta_j^2.
 $$
 
-La pénalité ramène les coefficients instables vers zéro. La standardisation est ajustée dans le pipeline d'entraînement, si bien que chaque coefficient correspond au déplacement d'une variable d'un écart-type. Les premiers 60 % des lignes complètes servent à l'entraînement, les 20 % suivants à la validation et les derniers 20 % au test. Aucun mélange aléatoire n'intervient.
+La régression ridge a été introduite par [Hoerl et Kennard (1970)](https://doi.org/10.1080/00401706.1970.10488634). La standardisation est estimée sur les seules lignes d'entraînement. L'exponentielle d'une prévision logarithmique produit une variance positive mais, sans correction de retransformation, elle estime sous des hypothèses usuelles une médiane conditionnelle plutôt qu'une moyenne conditionnelle. Ce choix correspond plus naturellement à l'erreur absolue moyenne (MAE) qu'à la racine de l'erreur quadratique moyenne (RMSE). L'expérience publie les deux, donc ce décalage entre objectif et métrique demeure une limite.
 
-Le panel final compte 501 observations complètes :
+La séparation est chronologique : 60 % pour l'entraînement, 20 % pour la validation et 20 % pour le test avant purge. Deux cibles voisines sur cinq jours partagent quatre rendements futurs. Les cinq dernières lignes avant la validation et le test portent donc l'étiquette `purged` et sont exclues de l'ajustement comme de toutes les métriques.
 
-| Split | Rows | First date | Last date |
+| Segment | Lignes | Première date | Dernière date |
 | --- | ---: | --- | --- |
-| Train | 300 | 2024-01-30 | 2025-03-24 |
-| Validation | 100 | 2025-03-25 | 2025-08-11 |
-| Test | 101 | 2025-08-12 | 2025-12-30 |
+| Entraînement | 293 | 2024-01-30 | 2025-03-13 |
+| Purge avant validation | 5 | 2025-03-14 | 2025-03-20 |
+| Validation | 94 | 2025-03-21 | 2025-07-30 |
+| Purge avant test | 5 | 2025-07-31 | 2025-08-06 |
+| Test | 100 | 2025-08-07 | 2025-12-24 |
 
-L'étude calcule la racine de l'erreur quadratique moyenne (RMSE), l'erreur absolue moyenne (MAE) et la perte QLIKE. La RMSE élève les erreurs au carré avant d'en prendre la moyenne, ce qui donne plus de poids aux fortes erreurs. La MAE moyenne les écarts absolus. Pour une variance réalisée $v_t$ et une prévision strictement positive $f_t$, QLIKE vaut
+Les mesures sont la RMSE, la MAE et QLIKE. Notons $v_t>0$ la variance réalisée, $f_t>0$ la variance prévue et $N$ le nombre de lignes évaluées. QLIKE vaut
 
 $$
-QLIKE = \frac{1}{n}\sum_{t=1}^{n}\left[\ln(f_t)+\frac{v_t}{f_t}\right].
+QLIKE = \frac{1}{N}\sum_{t=1}^{N}
+\left[\ln(f_t)+\frac{v_t}{f_t}\right].
 $$
 
-Pour les trois mesures, une valeur plus basse est préférable. QLIKE peut être négative lorsque la variance est exprimée en unités décimales. Son niveau absolu compte moins que la comparaison des modèles sur exactement le même échantillon.
+Pour les trois mesures, une valeur plus basse est préférable. QLIKE peut être négative lorsque la variance est exprimée en décimales. [Patton (2011)](https://doi.org/10.1016/j.jeconom.2010.03.034) explique pourquoi le choix de la fonction de perte compte lorsque la volatilité elle-même est mesurée avec erreur.
 
-## Le résultat synthétique ne favorise pas ridge
+## La persistance gagne toujours le test corrigé
 
-Le test livre un verdict net. La persistance obtient les plus faibles RMSE, MAE et QLIKE. Ridge fait environ 17 % moins bien sur la MAE. Quant au benchmark fondé sur la volatilité implicite ATM au carré, sa MAE est environ 3 033 fois celle de la persistance.
+Après correction de la cible, purge de dix lignes aux frontières et construction déterministe de la variable ATM, la persistance obtient les plus faibles RMSE, MAE et QLIKE hors échantillon. La MAE de ridge est supérieure de 5,8 %. Celle de la volatilité implicite ATM au carré atteint environ 2 135 fois la MAE de la persistance.
 
-| Model | Test RMSE | Test MAE | Test QLIKE | MAE / persistence |
+| Modèle | RMSE test | MAE test | QLIKE test | MAE / persistance |
 | --- | ---: | ---: | ---: | ---: |
-| Persistence | 1.23e-05 | 9.96e-06 | -10.007959 | 1.00x |
-| ATM IV squared | 3.03e-02 | 3.02e-02 | -3.502271 | 3,033.11x |
-| Ridge | 1.52e-05 | 1.17e-05 | -8.764908 | 1.17x |
+| Persistance | 1.76e-05 | 1.43e-05 | -9.582540 | 1.00x |
+| VI ATM au carré | 3.06e-02 | 3.05e-02 | -3.492651 | 2,135.39x |
+| Ridge | 1.99e-05 | 1.51e-05 | -7.447701 | 1.06x |
 
 ![Variance réalisée et prévisions pendant la période de test](images/01_test_forecasts.png)
 
-L'axe vertical logarithmique n'est pas un choix esthétique. Sur une échelle linéaire, la série ATM implicite écraserait contre zéro la variance réalisée, la persistance et ridge. Dans ces données synthétiques, l'écart-type des rendements quotidiens du sous-jacent n'est que de 0,024 %, tandis que la volatilité implicite ATM reste à des niveaux qui ressemblent davantage à ceux d'un marché ordinaire. Son carré produit des prévisions proches de $0.03$, alors que la variance réalisée se situe plutôt autour de $10^{-5}$. Les deux processus simulés n'ont tout simplement pas été calibrés ensemble.
+L'axe vertical logarithmique est nécessaire. La volatilité quotidienne des rendements du sous-jacent synthétique vaut 0,024 %, tandis que la volatilité implicite ATM reste proche de niveaux plausibles sur un marché ordinaire. Son carré produit une variance annualisée proche de $0.03$. La variance réalisée de l'échantillon de test va de $1.31\times10^{-7}$ à $5.96\times10^{-5}$. Le générateur n'a pas calibré ensemble les processus des options et du sous-jacent.
 
 ![Erreur absolue moyenne de test rapportée au benchmark de persistance](images/02_relative_mae.png)
 
-La comparaison détecte précisément ce qu'un benchmark doit mettre en évidence. Le carré de la volatilité implicite a bien l'unité d'une prévision de variance, mais la cohérence dimensionnelle ne garantit pas la calibration. Ridge peut ajuster un mélange de tendances synthétiques pendant l'entraînement sans pour autant découvrir une information prédictive stable hors échantillon. En fin de période de test, ses prévisions passent sous la cible, alors que la persistance en suit encore l'ordre de grandeur.
+Le second graphique livre deux informations. Le benchmark de volatilité implicite a les bonnes unités mais une calibration économique incohérente. Ridge reste proche de la persistance en MAE, sans la battre, et se comporte beaucoup moins bien selon QLIKE. Rien dans ces résultats ne permet d'affirmer que les variables d'options améliorent la prévision de variance de SPY.
 
-Ces résultats ont une valeur comme preuve logicielle. Ils confirment que le chargement, la construction des variables, la séparation chronologique, l'entraînement, le retour depuis l'espace logarithmique, les métriques et les figures s'exécutent de bout en bout. Ce ne sont pas des estimations de l'information contenue dans une véritable surface d'options.
+## Ce que l'expérience établit, et ce qu'elle n'établit pas
 
-## Ce qu'il faudrait changer avant d'en faire une étude de marché
+La nouvelle exécution, les 18 tests unitaires et l'exécution non interactive du notebook confirment que le chargeur hors ligne, la cible corrigée, les filtres de cotations, la séparation purgée, le modèle, les métriques et les graphiques fonctionnent ensemble. Les fichiers CSV figés dans `blog/data/` reproduisent chaque valeur de test tracée.
 
-Je remplacerais d'abord les données. Les cours réels de SPY exigent une convention de prix ajustés, un calendrier de séances boursières et une heure de snapshot documentée. Les cotations d'options demandent des filtres pour les prix périmés, les marchés croisés, les bids trop faibles et l'open interest insuffisant, ainsi qu'un traitement cohérent des dividendes et des taux. Le calendrier synthétique emploie de simples jours ouvrés, qui peuvent inclure des jours fériés boursiers.
+Ils ne démontrent aucune prévisibilité de marché. Une étude en données réelles doit encore utiliser un calendrier de séances, des prix ajustés du sous-jacent, une heure précise de snapshot des options antérieure ou égale à celle des variables, des règles contre les cotations périmées, une interpolation à maturité fixe, un skew à delta fixe, les taux et dividendes ainsi que des diagnostics complets d'arbitrage statique. Les choix de modèle et de pénalité doivent se faire sur la validation, puis le test ne doit être ouvert qu'une fois. Des réestimations glissantes permettraient d'observer l'instabilité des coefficients.
 
-Je reverrais ensuite la représentation de la surface. J'interpolerais la variance implicite totale à des maturités fixes, calculerais le skew à delta fixe et conserverais un diagnostic de couverture pour chaque date. On éviterait ainsi de prendre un changement de grille de strikes ou d'échéances pour un signal.
+La comparaison des prévisions demande aussi une mesure d'incertitude adaptée au chevauchement des horizons. Un test de Diebold-Mariano, proposé par [Diebold et Mariano (1995)](https://doi.org/10.1080/07350015.1995.10524599), nécessiterait ici une estimation de variance de long terme qui tienne compte de ce chevauchement. La valeur économique exigerait un trade de variance précisément défini et tous ses coûts d'exécution.
 
-L'évaluation mérite aussi d'être durcie. Les cibles futures sur cinq jours se chevauchent : deux observations voisines partagent quatre rendements. Une séparation chronologique classique empêche le lookahead direct, mais elle ne supprime pas la dépendance à la frontière entre entraînement et validation, ni entre validation et test. Purger au moins $h=5$ observations autour de chaque frontière donnerait une comparaison hors échantillon plus propre. Des réestimations sur fenêtre croissante ou glissante montreraient aussi si les coefficients résistent aux différents régimes.
-
-Enfin, tout choix de modèle devrait se faire uniquement sur la validation, puis la période de test ne devrait être ouverte qu'une fois. Un modèle HAR-RV (heterogeneous autoregressive realized variance), une variable de variance implicite moins réalisée, un test de comparaison prédictive de Diebold-Mariano avec erreurs-types adaptées au chevauchement et une évaluation économique reliée à un véritable trade de variance seraient des prolongements naturels. D'ici là, la conclusion doit rester modeste : le projet fournit une bonne ossature de recherche hors ligne, mais son résultat synthétique teste cette ossature, pas une hypothèse de marché.
+La conclusion corrigée est étroite, mais utile : ce dépôt fournit maintenant une ossature plus propre pour prévoir la variance. Sur ces données synthétiques, la persistance gagne. Le projet ne dit encore rien sur un arbitrage ni sur un avantage exploitable.

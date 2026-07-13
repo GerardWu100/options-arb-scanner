@@ -61,7 +61,7 @@ data/raw/options_quotes.parquet + data/raw/underlying_daily.parquet
   -> io/local_loader.py validates schema, symbols, coverage, manifest
   -> targets/realized_variance.py builds forward 5-day annualized RV target
   -> features/option_surface.py builds one row per symbol-date feature panel
-  -> evaluation/splits.py defines chronological train/validation/test windows
+  -> evaluation/splits.py defines purged chronological windows
   -> models/baselines.py produces baseline forecasts
   -> models/train.py fits ridge model and prediction tables
   -> evaluation/metrics.py computes RMSE, MAE, and optional QLIKE
@@ -84,3 +84,12 @@ Pipeline outputs live under `outputs/` and include:
 - PNG figures in `outputs/figures/`
 
 No HTML, dashboard, or frontend assets are produced.
+
+## Research Boundaries
+
+The historical repository name mentions arbitrage, but the active package is a
+variance-forecasting experiment. It filters individually invalid quotes without
+testing a full option surface for static arbitrage. Five-day labels overlap, so
+the pipeline removes five observations before the validation and test segments.
+The committed synthetic inputs support reproducibility tests only; they cannot
+support a claim about SPY forecastability or a tradeable variance risk premium.

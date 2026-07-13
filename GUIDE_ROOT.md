@@ -51,3 +51,6 @@ Where to start:
 
 - 2026-04-19: Repository pivoted from static arbitrage scanning to offline options-to-realized-variance research with local Parquet-first runtime.
 - 2026-05-20: Standardized layout (`config.toml` at root, `tests/unit/`, `scripts/`).
+- 2026-07-13: Corrected the forward-return alignment, purged overlapping labels
+  at evaluation boundaries, and clarified that the active project forecasts
+  variance rather than scanning arbitrage.

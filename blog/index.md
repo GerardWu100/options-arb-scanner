@@ -1,6 +1,6 @@
 ---
 title: "Can an Option Surface Forecast Realized Variance?"
-description: "A leakage-controlled offline experiment with SPY option-surface features, simple benchmarks, and one result that refuses to flatter the model."
+description: "An audited SPY variance-forecasting experiment: corrected target alignment, purged evaluation, option-surface logic, and a synthetic result that persistence wins."
 date: 2026-07-13
 image: images/cover-options-rv.png
 categories: ["Quantitative Research", "Risk Management"]
@@ -8,131 +8,170 @@ categories: ["Quantitative Research", "Risk Management"]
 
 # Can an Option Surface Forecast Realized Variance?
 
-The repository is called `options-arb-scanner`, but its current code no longer scans for arbitrage. It asks a narrower question: can a small set of end-of-day option-surface features forecast SPY's realized variance over the next five trading days?
+The repository is called `options-arb-scanner`, but the current code does not scan for arbitrage. It compresses an end-of-day SPY option chain into six features and asks whether they forecast annualized realized variance over the next five trading days.
 
-That distinction matters. An arbitrage claim needs tradeable prices, execution rules, and a proof that the apparent profit survives costs. This project does none of those things. It builds a supervised forecasting experiment with an offline data contract, chronological evaluation, two simple benchmarks, and ridge regression. The honest subject of the post is the experiment the code runs today.
+Those are different research problems. A relative-value scanner compares executable option prices against no-arbitrage relationships or a pricing model, then accounts for transaction costs and hedge execution. This project fits a statistical forecast. Its output is a variance estimate, not a trade or a guaranteed profit.
 
-There is another constraint worth stating up front. The committed dataset is deterministic and synthetic. It covers 522 business-day observations from 2 January 2024 through 31 December 2025, with 20,880 option quotes. Each date has four expiries, five moneyness levels, and both calls and puts. This makes the pipeline portable and testable. It does not make the output evidence about the live SPY options market.
+The distinction became more than editorial during a second audit. The original target implementation had an off-by-one error: its rolling operation could include the return ending on the feature date. A constant-return unit test passed because every possible window had the same value. A non-constant hand example exposed the defect. The corrected pipeline also purges overlapping labels at split boundaries and rejects individually invalid quotes.
 
 ![A stylized option surface flowing into an uncertain realized-variance forecast](images/cover-options-rv.png)
 
-The image captures the pipeline's basic compression: a two-dimensional option surface observed today becomes one forecast for a quantity that will only be known after five more sessions.
+The committed sample contains 522 business-day rows from 2 January 2024 through 31 December 2025 and 20,880 synthetic option quotes. It is deterministic test data. The results below test the research pipeline, not the live SPY options market.
 
-## Start with a target that cannot see the present
+## Define the quantity before forecasting it
 
-Let $S_t$ denote the SPY close on trading date $t$. The daily log return $r_t$, measured from $t-1$ to $t$, is
+Let $S_t$ be the SPY closing price on trading date $t$. The close-to-close log return ending on $t$ is $r_t$:
 
 $$
 r_t = \ln\left(\frac{S_t}{S_{t-1}}\right).
 $$
 
-The forecast horizon is $h=5$ trading days and the annualization factor is $A=252$ trading days per year. The annualized forward realized variance attached to date $t$ is
+Let $h=5$ be the forecast horizon in trading days and let $A=252$ be the annualization factor in trading days per year. The unannualized forward realized variance known after date $t+h$ is
 
 $$
-RV^{(A)}_{t,t+h} = \frac{A}{h}\sum_{i=1}^{h}r_{t+i}^{2}.
+RV_{t,t+h} = \sum_{i=1}^{h}r_{t+i}^{2}.
 $$
 
-Every return in that sum occurs after date $t$. The first is $r_{t+1}$, not $r_t$. This is the small indexing choice on which the whole study rests: a feature observed at the close of $t$ must not be evaluated against a label that already includes the return ending at that close.
+Multiplying the average daily squared return by $A$ gives the annualized target:
 
-The implementation makes the shift explicit before applying the rolling window:
+$$
+RV^{(A)}_{t,t+h}
+= A\left(\frac{1}{h}\sum_{i=1}^{h}r_{t+i}^{2}\right)
+= \frac{A}{h}RV_{t,t+h}.
+$$
+
+Every return in this label ends after $t$. The implementation now forms a completed trailing sum and moves the sum back by $h$ rows:
 
 ```python
 forward_sum_squared_returns = frame.groupby("symbol")[
     "squared_log_return"
 ].transform(
-    lambda series: (
-        series.shift(-1)
-        .rolling(window=horizon_days, min_periods=horizon_days)
-        .sum()
+    lambda series: series.rolling(
+        window=horizon_days, min_periods=horizon_days
     )
+    .sum()
+    .shift(-horizon_days)
 )
 ```
 
-The model is fitted to $\ln(RV^{(A)}_{t,t+h})$ rather than the variance level. Logs keep fitted forecasts positive after exponentiation and reduce the influence of large variance observations. Metrics are still calculated in variance space, where the result is easier to interpret.
+For a two-day hand check, suppose the returns ending on dates 1 through 4 are $0.01$, $0.02$, $0.03$, and $0.04$. The target on date 0 must use $0.01^2+0.02^2$. The target on date 1 must use $0.02^2+0.03^2$. The new unit test checks both values. This catches an indexing error that a constant sequence cannot reveal.
 
-## Reduce the chain to six numbers
+This realized-variance definition follows the high-frequency variance literature, although the present project uses daily returns rather than intraday returns. [Andersen, Bollerslev, Diebold, and Labys (2003)](https://doi.org/10.1111/1468-0262.00418) give the empirical foundation for modeling and forecasting realized volatility.
 
-An option chain is not naturally a rectangular machine-learning table. Strike grids and expiration dates vary, while several quotes may be equally close to a desired point on the surface. The feature builder resolves this by applying the same deterministic selection rules on every symbol-date.
+## Turn an irregular chain into six daily features
 
-For a quote with bid implied volatility $\sigma^{bid}$ and ask implied volatility $\sigma^{ask}$, the mid implied volatility is
+For each option quote, let $b$ be the bid price and $a$ be the ask price. Let $\sigma^{bid}$ and $\sigma^{ask}$ be the implied volatilities backed out from those two prices. The code defines the price and implied-volatility mids as
 
 $$
-\sigma^{mid} = \frac{\sigma^{bid}+\sigma^{ask}}{2}.
+m = \frac{a+b}{2}, \qquad
+\sigma^{mid} = \frac{\sigma^{ask}+\sigma^{bid}}{2}.
 $$
 
-The code selects the available expiration nearest 30 calendar days and the one nearest 60 calendar days. Within each slice, the at-the-money (ATM) quote is the strike with the smallest absolute log moneyness, where log moneyness is $\ln(K/S_t)$ and $K$ is strike price. If $\sigma_{30}$ and $\sigma_{60}$ denote those ATM mids, the term slope is
+Before building a surface point, the pipeline removes crossed prices ($a<b$), nonpositive mids or strikes, nonpositive or reversed implied-volatility bounds, unknown option types, and negative volume or open interest. If a call and put share the closest at-the-money (ATM) strike, their mid implied volatilities are averaged. That makes the feature independent of input row order.
+
+The expiration nearest 30 calendar days supplies the short point. The expiration nearest 60 days supplies the long point. Let $K$ be strike price. Log moneyness is $\ln(K/S_t)$, so the ATM strike minimizes $|\ln(K/S_t)|$. If $\sigma_{30}$ and $\sigma_{60}$ are the selected ATM mids, then
 
 $$
 \text{term slope}_t = \sigma_{60}-\sigma_{30}.
 $$
 
-For downside skew, the code uses puts near 30 days. Let $\sigma_{30}^{put,down}$ be the mid implied volatility of the nearest strike strictly below spot and let $\sigma_{30}^{put,ATM}$ be the ATM put mid. Then
+For downside skew, let $\sigma_{30}^{put,down}$ be the mid implied volatility at the closest put strike strictly below spot, and let $\sigma_{30}^{put,ATM}$ be the ATM put mid. Then
 
 $$
-\text{downside skew}_t = \sigma_{30}^{put,down}-\sigma_{30}^{put,ATM}.
+\text{downside skew}_t
+= \sigma_{30}^{put,down}-\sigma_{30}^{put,ATM}.
 $$
 
-The sign is intuitive: a positive number means the below-spot put carries more implied volatility than the ATM put.
+A positive value says the below-spot put has higher implied volatility than the ATM put. The complete feature vector contains ATM 30-day implied volatility, the 60-minus-30-day term slope, downside skew, average relative bid-ask spread $(a-b)/m$, total open interest, and trailing 20-day annualized realized variance.
 
-Four option-derived features enter the model: ATM 30-day implied volatility, the 60-minus-30-day term slope, 30-day downside skew, and the average bid-ask spread divided by mid price. Total open interest supplies a fifth feature. Trailing 20-day annualized realized variance supplies the sixth and gives the regression access to the same recent-variance information used by the persistence benchmark.
+Nearest-strike and nearest-expiry selection is inspectable, but crude. A market study would interpolate total implied variance $\sigma^2\tau$, where $\tau$ is time to expiry in years, to fixed maturities and calculate skew at fixed option deltas. The [Cboe VIX methodology](https://cdn.cboe.com/api/global/us_indices/governance/VIX_Methodology.pdf) shows a model-free, multi-strike approach to extracting a constant-maturity variance measure from SPX options. This project uses SPY options, and squaring one ATM quote is not the VIX calculation.
 
-This nearest-expiry rule is simple, but it is not interpolation. A production study would normally interpolate total variance to fixed maturities and define delta-based, rather than nearest-strike, skew points. Here, determinism and inspectability take priority over a smoother surface estimate.
+## Quote validity is not an arbitrage test
 
-## Give the model benchmarks it should struggle to beat
+The new filters establish that a single record is usable. They do not establish that the surface is free of static arbitrage.
 
-The first benchmark is persistence: forecast the next five-day variance with trailing 20-day annualized realized variance. The second squares 30-day ATM implied volatility, converting an annualized volatility quote into variance.
-
-The main model is ridge regression. Let $x_t$ be the six standardized features on date $t$, let $y_t=\ln(RV^{(A)}_{t,t+5})$, let $\beta$ be the coefficient vector, and let $\alpha=1$ be the fixed penalty weight. With $n$ training observations, the fitted coefficients minimize
+For European calls with the same expiry, let $C(K)$ be the call price as a function of strike $K$. If $K_1<K_2$, absence of vertical-spread arbitrage requires
 
 $$
-\sum_{t=1}^{n}\left(y_t-x_t^{\mathsf{T}}\beta\right)^2
+C(K_1) \geq C(K_2).
+$$
+
+For equally spaced strikes $K_1<K_2<K_3$, absence of butterfly arbitrage requires convexity:
+
+$$
+C(K_1)-2C(K_2)+C(K_3) \geq 0.
+$$
+
+Let $P(K)$ be the corresponding put price, $r$ the continuously compounded risk-free rate, $q$ the continuous dividend yield, and $\tau$ time to expiry in years. European put-call parity requires
+
+$$
+C(K)-P(K)=S_t e^{-q\tau}-K e^{-r\tau}.
+$$
+
+The pipeline checks none of these cross-quote conditions. The equations above are European conditions, while listed SPY options permit American-style early exercise, so a live scanner would need the appropriate exercise-aware bounds. This project does not record exercise style. It also lacks executable size, fees, hedge slippage, borrow constraints, and synchronized timestamps. [Davis and Hobson (2007)](https://doi.org/10.1111/j.1467-9965.2007.00291.x) study option-price bounds and the arbitrage logic behind them. Calling this code an arbitrage scanner would overstate its scope.
+
+## Benchmarks, ridge, and a purged clock
+
+The persistence benchmark forecasts five-day annualized variance with trailing 20-day annualized variance. The option benchmark squares 30-day ATM implied volatility:
+
+$$
+f_t^{IV}=\sigma_{30,t}^{2}.
+$$
+
+Both $f_t^{IV}$ and $RV^{(A)}_{t,t+5}$ are annualized variance, so no extra factor of $5/252$ belongs in the comparison. Their matching units hide a strong economic assumption: a 30-day risk-neutral implied variance must proxy a five-day physical expected variance. Horizon mismatch and the variance risk premium can break that link even with perfect data.
+
+The main model is ridge regression. Let $x_t$ be the six standardized features, $y_t=\ln(RV^{(A)}_{t,t+5})$, $b$ be an intercept, $\beta$ be the six coefficients, $n$ be the number of training rows, and $\alpha=1$ be the penalty weight. The fitted parameters minimize
+
+$$
+\sum_{t=1}^{n}\left(y_t-b-x_t^{\mathsf{T}}\beta\right)^2
 +\alpha\sum_{j=1}^{6}\beta_j^2.
 $$
 
-The penalty shrinks unstable coefficients toward zero. Standardization is fitted inside the training pipeline, so each coefficient refers to a one-standard-deviation feature move. The earliest 60% of complete rows train the model, the next 20% form validation, and the latest 20% remain held out. No rows are shuffled.
+Ridge regression was introduced by [Hoerl and Kennard (1970)](https://doi.org/10.1080/00401706.1970.10488634). Standardization is learned on the training rows only. Exponentiating a log forecast produces a positive level forecast, but without a retransformation correction it estimates a conditional median under common assumptions, not the conditional mean. That is compatible with mean absolute error (MAE) more naturally than with root mean squared error (RMSE). The experiment reports both, so this objective mismatch remains a limitation.
 
-The final panel has 501 complete observations:
+The split is chronological: 60% train, 20% validation, and 20% test before purging. Adjacent five-day labels share four future returns. The last five rows before validation and test are therefore marked `purged` and excluded from every metric and from model fitting.
 
-| Split | Rows | First date | Last date |
+| Segment | Rows | First date | Last date |
 | --- | ---: | --- | --- |
-| Train | 300 | 2024-01-30 | 2025-03-24 |
-| Validation | 100 | 2025-03-25 | 2025-08-11 |
-| Test | 101 | 2025-08-12 | 2025-12-30 |
+| Train | 293 | 2024-01-30 | 2025-03-13 |
+| Purged before validation | 5 | 2025-03-14 | 2025-03-20 |
+| Validation | 94 | 2025-03-21 | 2025-07-30 |
+| Purged before test | 5 | 2025-07-31 | 2025-08-06 |
+| Test | 100 | 2025-08-07 | 2025-12-24 |
 
-The study reports root mean squared error (RMSE), mean absolute error (MAE), and QLIKE. RMSE squares errors before averaging, so large misses receive more weight. MAE averages absolute errors. For realized variance $v_t$ and a strictly positive forecast $f_t$, QLIKE is
+The losses are RMSE, MAE, and QLIKE. Let $v_t>0$ be realized variance, let $f_t>0$ be forecast variance, and let $N$ be the number of evaluated rows. QLIKE is
 
 $$
-QLIKE = \frac{1}{n}\sum_{t=1}^{n}\left[\ln(f_t)+\frac{v_t}{f_t}\right].
+QLIKE = \frac{1}{N}\sum_{t=1}^{N}
+\left[\ln(f_t)+\frac{v_t}{f_t}\right].
 $$
 
-Lower is better for all three losses. QLIKE can be negative because variance is measured in decimal units. Its level is less informative than a comparison made on the same sample.
+Lower is better for all three. QLIKE can be negative when variance is expressed in decimals. [Patton (2011)](https://doi.org/10.1016/j.jeconom.2010.03.034) explains why loss choice matters when volatility itself is measured with error.
 
-## The synthetic result does not flatter ridge
+## Persistence still wins the corrected test
 
-The held-out result is unambiguous. Persistence has the lowest RMSE, MAE, and QLIKE. Ridge misses persistence by about 17% on MAE. The squared-ATM-implied-volatility benchmark is roughly 3,033 times worse than persistence on MAE.
+After correcting the label, purging ten boundary rows, and rebuilding the ATM feature deterministically, persistence has the lowest held-out RMSE, MAE, and QLIKE. Ridge has 5.8% higher MAE. ATM implied volatility squared has about 2,135 times the persistence MAE.
 
 | Model | Test RMSE | Test MAE | Test QLIKE | MAE / persistence |
 | --- | ---: | ---: | ---: | ---: |
-| Persistence | 1.23e-05 | 9.96e-06 | -10.007959 | 1.00x |
-| ATM IV squared | 3.03e-02 | 3.02e-02 | -3.502271 | 3,033.11x |
-| Ridge | 1.52e-05 | 1.17e-05 | -8.764908 | 1.17x |
+| Persistence | 1.76e-05 | 1.43e-05 | -9.582540 | 1.00x |
+| ATM IV squared | 3.06e-02 | 3.05e-02 | -3.492651 | 2,135.39x |
+| Ridge | 1.99e-05 | 1.51e-05 | -7.447701 | 1.06x |
 
 ![Realized and forecast variance through the held-out test period](images/01_test_forecasts.png)
 
-The logarithmic vertical axis is not cosmetic. Without it, the ATM-implied series would flatten the realized, persistence, and ridge lines against zero. In the synthetic fixture, daily underlying returns have a standard deviation of only 0.024%, while ATM implied volatility sits around ordinary market-looking levels. Squaring that implied volatility produces forecasts near $0.03$. Realized variance is closer to $10^{-5}$. The two simulated processes were not calibrated to each other.
+The logarithmic vertical axis is necessary. The synthetic underlying has daily return volatility of 0.024%, while ATM implied volatility stays near ordinary market-looking levels. Squaring that implied volatility produces annualized variance near $0.03$. Realized variance in the test set ranges from $1.31\times10^{-7}$ to $5.96\times10^{-5}$. The generator did not calibrate its option and underlying processes to each other.
 
 ![Test mean absolute error relative to the persistence benchmark](images/02_relative_mae.png)
 
-The comparison catches exactly the kind of problem a benchmark is supposed to catch. Squared implied volatility is dimensionally a variance forecast, but dimensional consistency alone does not guarantee calibration. Ridge can fit combinations of the synthetic trends in the training segment, yet that does not create stable predictive information in the held-out segment. The late test forecasts drift below the target while persistence continues to track its scale.
+The second chart makes two points. The implied-volatility benchmark is dimensionally correct but economically uncalibrated. Ridge stays close to persistence on MAE, yet fails to beat it and performs much worse on QLIKE. Nothing here supports a claim that option features improve SPY variance forecasts.
 
-These numbers are useful as software evidence. They show that the loader, feature construction, split, training, inverse log transform, metrics, and figures run end to end. They are not estimates of how much information a real option surface contains.
+## What the experiment can and cannot establish
 
-## What I would change before treating this as research
+The fresh run, 18 unit tests, and non-interactive notebook execution establish that the offline loader, corrected target, quote filters, purged split, model, metrics, and charts work together. The frozen CSV files under `blog/data/` reproduce every plotted test value.
 
-The first replacement is the data. Real SPY closes need an adjusted-price convention, an exchange-session calendar, and a documented snapshot time. Real option quotes need stale-quote filters, crossed-market checks, minimum bid and open-interest rules, and a consistent treatment of dividends and rates. The synthetic calendar uses business days, which can include market holidays.
+They do not establish market predictability. A live study still needs exchange-session dates, adjusted underlying prices, a precise option snapshot time at or before the feature timestamp, stale-quote rules, fixed-maturity interpolation, delta-based skew, rates and dividends, and complete static-arbitrage diagnostics. Model and penalty choices should be made on validation data, with the test period opened once. Rolling refits would reveal coefficient instability.
 
-The second change is the surface representation. I would interpolate total implied variance to fixed maturities, compute skew at fixed deltas, and record coverage diagnostics for every date. That avoids allowing a changing strike or expiry grid to masquerade as a signal.
+Forecast comparisons also need uncertainty estimates that respect overlapping horizons. A Diebold-Mariano test, introduced by [Diebold and Mariano (1995)](https://doi.org/10.1080/07350015.1995.10524599), would require an overlap-aware long-run variance estimate here. Economic value would require a specified variance trade and all execution costs.
 
-The third change is evaluation. Five-day forward targets overlap, so neighboring labels share four returns. A standard chronological split prevents direct lookahead, but it does not remove dependence at the train-validation or validation-test boundary. Purging at least $h=5$ observations around each boundary would give a cleaner out-of-sample comparison. Rolling or expanding-window refits would also show whether coefficients survive different regimes.
-
-Finally, model selection should happen on validation data only, with the test period opened once. Useful additions include a HAR-RV model (heterogeneous autoregressive realized variance), an implied-minus-realized variance feature, Diebold-Mariano forecast-comparison tests with overlap-aware standard errors, and economic evaluation tied to an actual variance trade. Until then, the right conclusion is modest: this is a sound offline research skeleton, and its current synthetic result is a test of the skeleton rather than a finding about markets.
+The corrected conclusion is narrow and useful: this repository is now a cleaner variance-forecasting scaffold. Its synthetic benchmark result says persistence wins this fixture. It says nothing yet about arbitrage or a tradeable edge.

@@ -33,6 +33,16 @@ Expected filtering assumptions:
 - bounded expiry horizon (recommended: 7 to 90 calendar days)
 - single-symbol default (`SPY`) for compact payload
 
+Runtime quote validity checks:
+
+- recognized option type (`c` or `p`)
+- `0 <= bid <= ask` and positive mid price
+- `0 < bid_iv <= ask_iv`
+- positive strike
+- non-negative open interest and volume
+
+These checks do not establish static no-arbitrage across strikes or maturities.
+
 ## Dataset: `underlying_daily.parquet`
 
 Required columns:
@@ -76,3 +86,6 @@ The local loader enforces:
 
 If this contract is satisfied, runtime code in `src/options_rv/` executes without
 ClickHouse and without network access.
+
+The committed manifest identifies the current bundle as deterministic synthetic
+data. Portability does not imply market realism.

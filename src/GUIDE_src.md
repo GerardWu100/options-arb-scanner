@@ -13,6 +13,10 @@ script in `scripts/`, while reusable export code remains in the package.
 Normal execution is offline-first: CLI and notebook read committed Parquet files
 under `data/raw/` and write artifacts under `outputs/`.
 
+The package aligns each forward target strictly after its feature date and uses
+a horizon-length purge at chronological split boundaries. Quote filtering is a
+data-validity step, not a static-arbitrage scanner.
+
 ## Part 2: Code Reference
 
 - `options_rv/`: main package. See `options_rv/GUIDE_options_rv.md`.
@@ -28,3 +32,5 @@ Where to start:
 ## Part 3: Short Journal
 
 - 2026-05-20: Aligned layout with standard `src/` package tree; moved `config.toml` to repo root.
+- 2026-07-13: Documented corrected forward alignment, overlap purging, and the
+  distinction between quote validation and arbitrage testing.

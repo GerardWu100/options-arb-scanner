@@ -80,6 +80,39 @@ def test_forward_window_alignment_uses_t_plus_1_return() -> None:
     )
 
 
+def test_forward_window_alignment_excludes_contemporaneous_return() -> None:
+    """A non-constant example distinguishes the future window from a trailing one."""
+    daily_log_returns = [0.01, 0.02, 0.03, 0.04]
+    close_values = [100.0]
+    for daily_log_return in daily_log_returns:
+        close_values.append(close_values[-1] * math.exp(daily_log_return))
+
+    underlying_daily = pd.DataFrame(
+        {
+            "symbol": ["SPY"] * len(close_values),
+            "trade_date": pd.date_range(
+                "2025-01-01", periods=len(close_values), freq="B"
+            ),
+            "close": close_values,
+        }
+    )
+
+    target_frame = build_forward_realized_variance_target(
+        underlying_daily=underlying_daily,
+        horizon_days=2,
+        annualization_factor=252,
+        use_log_target=False,
+    )
+
+    expected_at_first_date = (252.0 / 2.0) * (0.01**2 + 0.02**2)
+    expected_at_second_date = (252.0 / 2.0) * (0.02**2 + 0.03**2)
+    np.testing.assert_allclose(
+        target_frame["annualized_forward_variance_2d"].iloc[:2],
+        [expected_at_first_date, expected_at_second_date],
+        rtol=1e-10,
+    )
+
+
 def test_rows_without_full_forward_window_are_removed() -> None:
     """Rows that cannot see the full horizon are excluded for leakage safety."""
     underlying_daily = pd.DataFrame(

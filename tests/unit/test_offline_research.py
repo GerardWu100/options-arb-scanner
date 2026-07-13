@@ -120,3 +120,6 @@ def test_run_offline_research_writes_expected_artifacts(tmp_path: Path) -> None:
 
     for path in expected_artifacts:
         assert path.exists(), f"Missing expected artifact: {path}"
+
+    predictions = pd.read_csv(output_dir / "tables" / "predictions.csv")
+    assert predictions["split"].value_counts()["purged"] == 10

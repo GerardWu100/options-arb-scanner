@@ -19,11 +19,29 @@ Symbols and conventions:
 - `RV_{t,t+5} = sum_{i=1}^{5} r_{t+i}^2`: forward 5-day realized variance in daily units.
 - `annualized_RV_{t,t+5} = (252 / 5) * RV_{t,t+5}`: annualized forward variance.
 
+The implementation first computes a trailing five-return sum and then shifts
+the completed sum back by five rows. This aligns the label at `t` with returns
+ending on `t+1` through `t+5`; shifting returns before applying a trailing
+window would be an off-by-one error.
+
 Model comparison:
 
 - Persistence baseline from trailing realized variance.
 - ATM implied-volatility baseline.
 - Ridge regression model on compact options features.
+
+The chronological 60%/20%/20% split purges five rows from the end of the train
+and validation segments. Adjacent five-day labels overlap, so this gap prevents
+training and evaluation labels from sharing future returns across a boundary.
+
+## Scope: Forecasting, Not Arbitrage
+
+The repository name is historical. The current package forecasts realized
+variance; it does not scan for relative-value trades or prove arbitrage.
+Quote-quality filters reject crossed prices, invalid implied-volatility bounds,
+nonpositive strikes or mids, and negative activity fields. They do not test
+cross-strike monotonicity, butterfly convexity, put-call parity, executable
+transaction costs, or borrow constraints.
 
 ## Offline Data Contract
 
@@ -105,3 +123,6 @@ This repository is designed for clear communication and reproducibility:
 - explainable features and linear model
 - strict chronological evaluation
 - portable offline execution from committed Parquet files
+
+The committed inputs are deterministic synthetic fixtures. Pipeline output is
+software evidence, not an empirical result about listed SPY options.

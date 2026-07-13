@@ -19,3 +19,7 @@ can run tests, CLI, and notebook without any database connection.
 - Keep schema stable unless docs and loader validation are updated together.
 - Prefer compressed Parquet with `zstd`.
 - Keep symbol scope narrow for payload control; default is only `SPY`.
+
+The current manifest records a deterministic synthetic generator as the source.
+These files test portability and execution; they are not historical SPY market
+observations.

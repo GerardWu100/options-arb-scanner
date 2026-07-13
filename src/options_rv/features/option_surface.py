@@ -53,9 +53,10 @@ def build_option_surface_features(
     ).dt.normalize()
     option_frame["mid_iv"] = 0.5 * (option_frame["bid_iv"] + option_frame["ask_iv"])
     option_frame["mid_price"] = 0.5 * (option_frame["bid"] + option_frame["ask"])
+    option_frame = _filter_valid_quotes(option_frame=option_frame)
     option_frame["spread_ratio"] = (
         option_frame["ask"] - option_frame["bid"]
-    ) / option_frame["mid_price"].replace(0.0, np.nan)
+    ) / option_frame["mid_price"]
 
     spot_frame = underlying_daily.loc[:, ["symbol", "trade_date", "close"]].copy()
     spot_frame["trade_date"] = pd.to_datetime(spot_frame["trade_date"]).dt.normalize()
@@ -192,8 +193,13 @@ def _mid_iv_at_closest_strike(
         if candidates.empty:
             return float("nan")
 
-    selected_row = candidates.loc[candidates["log_moneyness"].abs().idxmin()]
-    return float(selected_row["mid_iv"])
+    minimum_distance = float(candidates["log_moneyness"].abs().min())
+    closest_rows = candidates.loc[
+        np.isclose(candidates["log_moneyness"].abs(), minimum_distance)
+    ]
+    # Call and put quotes can share the closest strike. Averaging their mids is
+    # deterministic and avoids making the feature depend on input row order.
+    return float(closest_rows["mid_iv"].mean())
 
 
 def _below_spot_put_mid_iv(slice_frame: pd.DataFrame) -> float:
@@ -250,6 +256,55 @@ def _validate_option_contract(options_quotes: pd.DataFrame) -> None:
         )
 
 
+def _filter_valid_quotes(option_frame: pd.DataFrame) -> pd.DataFrame:
+    """Remove quotes that cannot support price or implied-volatility features.
+
+    Parameters
+    ----------
+    option_frame
+        Option records after mid-price and mid-implied-volatility construction.
+
+    Returns
+    -------
+    pd.DataFrame
+        Quotes with non-crossed prices, ordered positive implied volatilities,
+        positive strikes, recognized option types, and non-negative activity.
+
+    Raises
+    ------
+    ValueError
+        If every supplied quote fails the quality checks.
+    """
+    numeric_columns = [
+        "strike_price",
+        "bid",
+        "ask",
+        "bid_iv",
+        "ask_iv",
+        "open_interest",
+        "volume",
+        "mid_price",
+        "mid_iv",
+    ]
+    finite_numeric = np.isfinite(option_frame[numeric_columns]).all(axis=1)
+    valid_mask = (
+        finite_numeric
+        & option_frame["option_type"].isin(["c", "p"])
+        & option_frame["strike_price"].gt(0.0)
+        & option_frame["bid"].ge(0.0)
+        & option_frame["ask"].ge(option_frame["bid"])
+        & option_frame["mid_price"].gt(0.0)
+        & option_frame["bid_iv"].gt(0.0)
+        & option_frame["ask_iv"].ge(option_frame["bid_iv"])
+        & option_frame["open_interest"].ge(0.0)
+        & option_frame["volume"].ge(0.0)
+    )
+    filtered_frame = option_frame.loc[valid_mask].copy()
+    if filtered_frame.empty:
+        raise ValueError("No valid option quotes remain after quote-quality filtering")
+    return filtered_frame
+
+
 def _validate_underlying_contract(underlying_daily: pd.DataFrame) -> None:
     """Validate required underlying columns for moneyness calculations."""
     required_columns = ["symbol", "trade_date", "close"]
@@ -260,3 +315,6 @@ def _validate_underlying_contract(underlying_daily: pd.DataFrame) -> None:
         raise ValueError(
             f"underlying_daily is missing required columns: {', '.join(missing_columns)}"
         )
+    close_values = underlying_daily["close"].to_numpy(dtype=float)
+    if not np.isfinite(close_values).all() or (close_values <= 0.0).any():
+        raise ValueError("underlying_daily close must contain finite positive values")
