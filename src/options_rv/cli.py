@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import argparse
 from dataclasses import dataclass
 from pathlib import Path
-import argparse
+
 import tomllib
 
 from options_rv.pipeline.offline_research import run_offline_research
@@ -78,8 +79,16 @@ def load_config(config_path: Path) -> OfflineResearchConfig:
     -------
     OfflineResearchConfig
         Parsed configuration dataclass.
+
+    Notes
+    -----
+    A relative ``raw_dir`` is interpreted relative to the directory holding the
+    configuration file, not the current working directory. The shipped
+    ``config.toml`` sits at the project root and stores ``raw_dir = "data/raw"``,
+    so this keeps the installed ``options-rv`` command working from any folder.
     """
-    config_object = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    resolved_config_path = config_path.resolve()
+    config_object = tomllib.loads(resolved_config_path.read_text(encoding="utf-8"))
 
     runtime_object = config_object.get("runtime", {})
     if not isinstance(runtime_object, dict):
@@ -90,8 +99,12 @@ def load_config(config_path: Path) -> OfflineResearchConfig:
     horizon_value = runtime_object.get("horizon_days", 5)
     annualization_value = runtime_object.get("annualization_factor", 252)
 
+    raw_dir_path = Path(str(raw_dir_value))
+    if not raw_dir_path.is_absolute():
+        raw_dir_path = resolved_config_path.parent / raw_dir_path
+
     return OfflineResearchConfig(
-        raw_dir=Path(str(raw_dir_value)),
+        raw_dir=raw_dir_path,
         symbol=str(symbol_value),
         horizon_days=int(horizon_value),
         annualization_factor=int(annualization_value),

@@ -13,12 +13,11 @@ Notes
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
-import json
 
 import pandas as pd
-
 
 REQUIRED_OPTIONS_COLUMNS: tuple[str, ...] = (
     "symbol",
@@ -306,7 +305,12 @@ def _validate_manifest_file_entry(
         )
 
     manifest_rows = file_entry.get("rows")
-    if int(manifest_rows) != int(len(frame)):
+    if not isinstance(manifest_rows, int) or isinstance(manifest_rows, bool):
+        raise RawDataValidationError(
+            f"manifest.json files['{file_name}'] must include an integer 'rows' "
+            f"count, found: {manifest_rows!r}"
+        )
+    if manifest_rows != len(frame):
         raise RawDataValidationError(
             f"manifest.json row count mismatch for {file_name}: "
             f"manifest={manifest_rows}, observed={len(frame)}"

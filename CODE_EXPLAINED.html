@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>options-arb-scanner - code explained</title>
+<script>
+  window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script type="module">
+  // the map diagram at the top of the page; theme follows the page palette
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  const isLight = document.documentElement.getAttribute("data-theme") === "light";
+  mermaid.initialize({ startOnLoad: true, theme: isLight ? "neutral" : "dark",
+                       flowchart: { curve: "basis", useMaxWidth: true } });
+</script>
+<style>
+  :root{
+    /* dark is the default palette; a light override follows below */
+    --paper:#12161b; --bg:#12161b; --panel:#1b2027; --card:#1a1f26; --surface:#1a1f26; --raise:#1e242c;
+    --ink:#e9eef4; --soft:#b3bec9; --muted:#b3bec9; --faint:#828d99;
+    --line:#2c343e; --line2:#232a33;
+    --green:#6fc796; --greenbg:#14241c; --greenline:#2f4d3a;
+    --amber:#e0b365; --amberbg:#262010; --amberline:#4d3f20;
+    --blue:#87b8ee; --bluebg:#141e2b; --blueline:#2d425c;
+    --red:#e89296; --redbg:#26161a; --redline:#4f2f35;
+    --slate:#a7b1be; --slatebg:#1c2027; --slateline:#353c46;
+    --accent:#4fb9c2; --accent-ink:#6fd0d8; --accent-bg:#10262a;
+    --def:#87b8ee; --def-bg:#141e2b; --def-bd:#2d425c;
+    --why:#6fc796; --why-bg:#14241c; --why-bd:#2f4d3a;
+    --warn:#e0b365; --warn-bg:#262010; --warn-bd:#4d3f20;
+    --flag:#e89296; --flag-bg:#26161a; --flag-bd:#4f2f35;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;
+  }
+  :root[data-theme="light"]{
+    --paper:#faf8f4; --bg:#faf8f4; --panel:#f1ede6; --card:#ffffff; --surface:#ffffff; --raise:#fbfaf7;
+    --ink:#1b1b1b; --soft:#4a453e; --muted:#4a453e; --faint:#777067;
+    --line:#d6d0c6; --line2:#e7e2da;
+    --green:#2f6b4c; --greenbg:#e7f1ea; --greenline:#bcdac9;
+    --amber:#8f6413; --amberbg:#f6efdd; --amberline:#e3d3a8;
+    --blue:#2c5f95; --bluebg:#e7eef7; --blueline:#c3d6ea;
+    --red:#943232; --redbg:#f6eaea; --redline:#e2c4c4;
+    --slate:#525a66; --slatebg:#eceef1; --slateline:#cdd2d9;
+    --accent:#0e7c86; --accent-ink:#0b5f67; --accent-bg:#e7f4f4;
+    --def:#2c5f95; --def-bg:#e7eef7; --def-bd:#c3d6ea;
+    --why:#2f6b4c; --why-bg:#e7f1ea; --why-bd:#bcdac9;
+    --warn:#8f6413; --warn-bg:#f6efdd; --warn-bd:#e3d3a8;
+    --flag:#943232; --flag-bg:#f6eaea; --flag-bd:#e2c4c4;
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth;font-size:16px}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    font-size:18px;line-height:1.58;-webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility}
+  .wrap{padding:2.2em clamp(1em,4vw,3.2em) 5em}
+
+  h1{font-size:clamp(2.1rem,5vw,2.7rem);line-height:1.12;letter-spacing:-.02em;font-weight:800;
+    text-wrap:balance;margin:.2em 0 .2em}
+  h2{font-size:1.5rem;font-weight:750;letter-spacing:-.01em;text-wrap:balance;
+    margin:2.4em 0 .5em;padding-top:.7em;border-top:2px solid var(--line)}
+  h3{font-size:1.26rem;font-weight:700;margin:1.7em 0 .4em;color:var(--ink)}
+  h3 code{font-size:.92em}
+  h4{font-size:1rem;margin:1.3em 0 .3em;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+  p{margin:.7em 0}
+  ul,ol{margin:.55em 0;padding-left:1.3em}
+  li{margin:.3em 0}
+  strong,b{color:var(--ink)}
+  a{color:var(--accent-ink);text-underline-offset:2px}
+  a:hover{color:var(--accent)}
+  hr{border:none;border-top:1px solid var(--line);margin:2.5em 0}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  code{font-family:var(--mono);font-size:.9em;background:var(--panel);color:var(--ink);
+    padding:.1em .4em;border-radius:4px}
+  pre{background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:1em 1.15em;
+    overflow-x:auto;font-size:.94rem;line-height:1.62;margin:1.1em 0;color:var(--ink);
+    font-family:var(--mono)}
+  pre code{background:none;padding:0;font-size:1em}
+  pre .c{color:var(--faint);font-style:italic}
+
+  .lede{font-size:1.12rem;line-height:1.48;color:var(--soft)}
+  .eyebrow{font-family:var(--mono);font-size:.78rem;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--accent-ink);margin:0 0 1.1em;display:flex;gap:.6em;align-items:center;flex-wrap:wrap}
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  .sec-no{font-family:var(--mono);font-size:.85rem;color:var(--accent-ink);
+    letter-spacing:.1em;display:block;margin-bottom:.15em}
+  .tag{display:inline-block;font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;
+    background:var(--greenbg);color:var(--green);border:1px solid var(--greenline);
+    padding:.25em .75em;border-radius:20px;margin-bottom:1em}
+  .big{font-size:1.42rem;font-weight:700;color:var(--green)}
+  .pill{font-variant-numeric:tabular-nums;font-weight:600}
+  .fnote{font-size:.95rem;color:var(--soft)}
+  .reads{margin:.55em 0}
+  .reads b{color:var(--soft)}
+  .foot{margin-top:3em;padding-top:1.2em;border-top:1px solid var(--line);
+    color:var(--soft);font-size:.95rem}
+
+  .box{border:1px solid var(--line);border-left-width:4px;border-radius:10px;
+    padding:1em 1.2em;margin:1.3em 0;background:var(--card)}
+  .box>:first-child{margin-top:0}.box>:last-child{margin-bottom:0}
+  .box p:first-child{margin-top:0}.box p:last-child{margin-bottom:0}
+  .box .k{font-weight:700;font-size:.82rem;text-transform:uppercase;letter-spacing:.08em;
+    display:block;margin-bottom:.45em}
+  .def{border-left-color:var(--def);background:var(--def-bg)}.def .k{color:var(--def)}
+  .gist{border-left-color:var(--accent);background:var(--accent-bg)}.gist .k{color:var(--accent-ink)}
+  .why{border-left-color:var(--why);background:var(--why-bg)}.why .k{color:var(--why)}
+  .warn{border-left-color:var(--warn);background:var(--warn-bg)}.warn .k{color:var(--warn)}
+  .flag{border-left-color:var(--flag);background:var(--flag-bg)}.flag .k{color:var(--flag)}
+  .data{border-left-color:var(--slate);background:var(--slatebg)}.data .k{color:var(--slate)}
+  .io{display:grid;grid-template-columns:1fr 1fr;gap:.9em}
+  .io.stack{grid-template-columns:1fr}
+  @media (max-width:820px){.io{grid-template-columns:1fr}}
+  .io .lab{font-family:var(--mono);font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--faint);font-weight:700}
+  .io pre{margin:.25em 0 0;font-size:.8rem;line-height:1.5}
+  .data>p{font-size:.95rem}
+
+  .toc{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:1.1em 1.4em;margin:1.8em 0}
+  .toc .rk{font-family:var(--mono);font-size:.76rem;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--faint);margin-bottom:.5em}
+  .toc ol{margin:.35em 0 0;padding-left:1.4em}
+  .toc a{text-decoration:none;color:var(--ink)}
+  .toc a:hover{color:var(--accent-ink)}
+
+  .scroll{overflow-x:auto;margin:1.2em 0}
+  table{border-collapse:collapse;width:100%;margin:1.2em 0;font-size:1rem;background:var(--card);
+    font-variant-numeric:tabular-nums}
+  .scroll table{margin:0}
+  th,td{border:1px solid var(--line);padding:.55em .75em;text-align:left;vertical-align:top}
+  th,thead th{background:var(--panel);color:var(--ink);font-weight:700}
+  td.n,th.n{text-align:right}
+  .pass{color:var(--green);font-weight:700}
+  .failw{color:var(--red);font-weight:700}
+
+  .chip{display:inline-block;font-size:.74rem;font-weight:700;text-transform:uppercase;
+    letter-spacing:.06em;padding:.15em .55em;border-radius:4px;white-space:nowrap;border:1px solid}
+  .c-veto{background:var(--redbg);color:var(--red);border-color:var(--redline)}
+  .c-drop{background:var(--amberbg);color:var(--amber);border-color:var(--amberline)}
+  .c-never{background:var(--slatebg);color:var(--slate);border-color:var(--slateline)}
+  .c-bug{background:var(--bluebg);color:var(--blue);border-color:var(--blueline)}
+  .legend{display:flex;flex-wrap:wrap;gap:.5em 1.1em;margin:1em 0 0;font-size:.92rem;color:var(--soft)}
+  .legend span.chip{margin-right:.4em}
+
+  figure{margin:1.6em 0;text-align:center}
+  figure img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;
+    background:#fff;padding:6px}
+  :root:not([data-theme="light"]) figure img{filter:brightness(.94) contrast(1.02)}
+  figcaption{font-size:.92rem;color:var(--soft);margin-top:.6em;
+    margin-left:auto;margin-right:auto}
+
+  /* the map diagram sits on its own plate and scrolls sideways rather than the page */
+  .mermaid{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:1.2em;margin:1.4em 0;overflow-x:auto;text-align:center;
+    font-family:var(--sans)}
+  .mermaid svg{max-width:100%;height:auto}
+
+  /* rendered maths inherits the page colour instead of MathJax's own default */
+  mjx-container,.katex{color:inherit}
+  mjx-container[display="true"],.katex-display{overflow-x:auto;overflow-y:hidden;padding:.15em 0}
+</style>
+</head><body>
+<div class="wrap">
+
+<p class="eyebrow"><span class="dot"></span>options-arb-scanner &middot; options_rv package &middot; code explained</p>
+<h1>Forecasting five-day realized variance from option quotes</h1>
+<p class="lede">What this repository actually contains, how the eight modules feed each other,
+and what each number in the output tables means. Every figure on this page came from running
+the code on the committed data on 10 August 2026.</p>
+
+<div class="box def">
+  <span class="k">How to use this</span>
+  <p>Sections follow execution order, from the configuration file to the written tables.
+  Code blocks are copied unedited from the files under <code>src/options_rv/</code>.
+  Coloured boxes carry plain-English summaries, formulas with every symbol defined,
+  real sample data, design reasons, and traps.</p>
+</div>
+
+<div class="box warn">
+  <span class="k">The folder name is misleading</span>
+  <p>The directory is called <b>options-arb-scanner</b>, but nothing in the code scans for
+  arbitrage. The installed package is <code>options_rv</code>, and it forecasts realized
+  variance. The name is a leftover from an abandoned idea, recorded in
+  <code>options-arb-scanner.md</code> and admitted in the README. Section
+  <a href="#noarb">10</a> sets out the no-arbitrage conditions a real scanner would test and
+  shows plainly that none of them appear in this code.</p>
+</div>
+
+<div class="box why">
+  <span class="k">The process in plain English</span>
+  <p>The code reads two small Parquet files: daily closing prices for the exchange-traded fund
+  SPY, and a daily snapshot of option quotes on SPY. From the closes it builds the thing to be
+  predicted: how much the price actually moved over the <i>next</i> five trading days. From the
+  option quotes it builds six numbers per day that describe the shape of the option market that
+  day. It then splits the timeline into an early training stretch, a middle validation stretch,
+  and a late test stretch, fits a simple penalized linear regression on the training stretch
+  only, and compares it against two dumb benchmarks. Finally it writes four tables, one chart,
+  and a short summary file.</p>
+</div>
+
+<h2 id="map"><span class="sec-no">00</span>Map</h2>
+
+<div class="mermaid">
+flowchart LR
+  cfg[/"config.toml"/] --> cli["cli.load_config()"]
+  cli --> pipe["run_offline_research()"]
+  pipe --> load["load_raw_data()"]
+  raw[("data/raw: 2 parquet files + manifest.json")] --> load
+  load --> tgt["build_forward_realized_variance_target()"]
+  load --> feat["build_option_surface_features()"]
+  tgt --> feat
+  tgt --> panel["panel frame: 6 features + label"]
+  feat --> panel
+  panel --> split["build_chronological_split_masks()"]
+  panel --> base["persistence and ATM-IV baselines"]
+  panel --> ridge["train_ridge_regression()"]
+  split --> ridge
+  base --> met["RMSE, MAE, QLIKE per split"]
+  ridge --> met
+  met --> out[("outputs/: 4 tables, 1 figure, summary.md")]
+</div>
+<p class="fnote">Rounded boxes are functions named exactly as they appear in the code. Cylinders
+are files on disk. The parallelogram is the configuration file. Arrows point the way data moves.
+Note that the target module feeds the feature module: the trailing-variance column is built once
+in <code>targets/</code> and joined into the feature panel.</p>
+
+<div class="toc">
+  <div class="rk">Contents</div>
+  <ol>
+    <li><a href="#layout">Folder layout and what runs what</a></li>
+    <li><a href="#config">Configuration and entry point &mdash; <code>config.toml</code>, <code>cli.py</code></a></li>
+    <li><a href="#loader">Reading and checking the raw cache &mdash; <code>load_raw_data</code></a></li>
+    <li><a href="#target">Building the thing to predict &mdash; <code>build_forward_realized_variance_target</code></a></li>
+    <li><a href="#features">The six option-surface features &mdash; <code>build_option_surface_features</code></a></li>
+    <li><a href="#splits">Splitting the timeline &mdash; <code>build_chronological_split_masks</code></a></li>
+    <li><a href="#baselines">Two benchmarks &mdash; <code>compute_persistence_baseline</code>, <code>compute_atm_iv_baseline</code></a></li>
+    <li><a href="#ridge">The model &mdash; <code>train_ridge_regression</code></a></li>
+    <li><a href="#metrics">Scoring the forecasts &mdash; <code>root_mean_squared_error</code>, <code>mean_absolute_error</code>, <code>qlike</code></a></li>
+    <li><a href="#noarb">The arbitrage conditions this code does not test</a></li>
+    <li><a href="#pipeline">Orchestration and outputs &mdash; <code>run_offline_research</code></a></li>
+    <li><a href="#refresh">The one-time database refresh &mdash; <code>clickhouse_export.py</code></a></li>
+    <li><a href="#results">What the run actually produced</a></li>
+    <li><a href="#fixes">Fixes applied</a></li>
+    <li><a href="#callgraph">Call graph</a></li>
+    <li><a href="#edge">Edge cases</a></li>
+    <li><a href="#traps">Gotchas and traps</a></li>
+    <li><a href="#questions">If someone points at a line</a></li>
+    <li><a href="#limits">Limitations, stated honestly</a></li>
+    <li><a href="#verify">How this page was verified</a></li>
+  </ol>
+</div>
+
+<h2 id="layout"><span class="sec-no">01</span>Folder layout and what runs what</h2>
+
+<p>The repository is a standard <code>src</code> layout. Everything importable lives in
+<code>src/options_rv/</code>; everything else is inputs, outputs, tests, or documents.</p>
+
+<pre>options-arb-scanner/
+├── config.toml                      <span class="c"># 4 runtime settings, read by cli.py</span>
+├── data/raw/                        <span class="c"># the only runtime input: 2 parquet + manifest.json</span>
+├── src/options_rv/
+│   ├── cli.py                       <span class="c"># entry point: parses args, reads config, calls the pipeline</span>
+│   ├── io/local_loader.py           <span class="c"># reads and validates data/raw</span>
+│   ├── io/clickhouse_export.py      <span class="c"># NOT used at runtime; refills data/raw from a database</span>
+│   ├── targets/realized_variance.py <span class="c"># the label, plus the trailing-variance feature</span>
+│   ├── features/option_surface.py   <span class="c"># one row of 5 option features per trading day</span>
+│   ├── evaluation/splits.py         <span class="c"># train / validation / test / purged labels</span>
+│   ├── evaluation/metrics.py        <span class="c"># RMSE, MAE, QLIKE</span>
+│   ├── models/baselines.py          <span class="c"># the two benchmark forecasts</span>
+│   ├── models/train.py              <span class="c"># the ridge regression</span>
+│   └── pipeline/offline_research.py <span class="c"># glues all of the above together, writes outputs</span>
+├── scripts/refresh_raw_from_clickhouse.py  <span class="c"># thin wrapper over clickhouse_export</span>
+├── notebooks/options_rv_pipeline_demo.ipynb <span class="c"># same functions, run step by step for teaching</span>
+├── tests/unit/                      <span class="c"># 18 tests</span>
+└── blog/generate_charts.py          <span class="c"># reruns the pipeline, freezes charts for an article</span></pre>
+
+<div class="box def"><span class="k">The three ways to run it</span>
+<p><b>1. Command line.</b> <code>uv run python -m options_rv.cli --config config.toml --output-dir outputs/demo_run</code>.
+There is also an installed console script named <code>options-rv</code>, declared in
+<code>pyproject.toml</code> under <code>[project.scripts]</code>.<br>
+<b>2. Notebook.</b> <code>notebooks/options_rv_pipeline_demo.ipynb</code> calls the same package
+functions one at a time so you can see each intermediate frame.<br>
+<b>3. Tests.</b> <code>uv run pytest -q</code> runs 18 unit and integration tests that build their
+own small synthetic inputs in a temporary folder.</p></div>
+
+<div class="box why"><span class="k">Why the database code is quarantined</span>
+<p>Only <code>io/clickhouse_export.py</code> imports <code>clickhouse_connect</code>, and only
+<code>scripts/refresh_raw_from_clickhouse.py</code> imports that module. Nothing on the normal
+path touches it. That means a fresh clone with <code>data/raw/</code> present runs the whole
+study with no network, no credentials, and no database. This is the single most useful structural
+decision in the repository.</p></div>
+
+<h2 id="config"><span class="sec-no">02</span>Configuration and entry point</h2>
+
+<pre><span class="c"># config.toml</span>
+[runtime]
+raw_dir = "data/raw"           <span class="c"># where the committed parquet files live</span>
+symbol = "SPY"                 <span class="c"># the only allowed value in this project</span>
+horizon_days = 5               <span class="c"># forecast horizon, in trading days</span>
+annualization_factor = 252     <span class="c"># trading days per year</span></pre>
+
+<div class="scroll">
+<table>
+<thead><tr><th>Setting</th><th>What changing it does</th></tr></thead>
+<tbody>
+<tr><td><code>raw_dir</code></td><td>Points the loader at a different bundle of Parquet files. A relative value is now read relative to the folder holding <code>config.toml</code> (see <a href="#fixes">Fixes applied</a>).</td></tr>
+<tr><td><code>symbol</code></td><td>Filters both raw files. Any symbol absent from either file makes the loader raise <code>RawDataValidationError</code>. The committed cache only holds SPY.</td></tr>
+<tr><td><code>horizon_days</code></td><td>Changes three things at once: how many future returns the label sums, the column names (<code>annualized_forward_variance_5d</code> becomes <code>..._10d</code>), and the size of the purge gap at each split boundary. Larger values shrink the panel, because the last <code>horizon_days</code> rows have no complete future window.</td></tr>
+<tr><td><code>annualization_factor</code></td><td>Scales every variance number, both label and trailing feature, by the same constant. It changes the level of RMSE and MAE but not which model wins.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3><code>load_config</code> &mdash; turn the TOML file into a frozen dataclass</h3>
+
+<pre>    resolved_config_path = config_path.resolve()
+    config_object = tomllib.loads(resolved_config_path.read_text(encoding="utf-8"))
+
+    runtime_object = config_object.get("runtime", {})
+    if not isinstance(runtime_object, dict):
+        raise ValueError("[runtime] section must be a TOML table")
+
+    raw_dir_value = runtime_object.get("raw_dir", "data/raw")
+    symbol_value = runtime_object.get("symbol", "SPY")
+    horizon_value = runtime_object.get("horizon_days", 5)
+    annualization_value = runtime_object.get("annualization_factor", 252)
+
+    raw_dir_path = Path(str(raw_dir_value))
+    if not raw_dir_path.is_absolute():
+        raw_dir_path = resolved_config_path.parent / raw_dir_path</pre>
+
+<div class="box gist"><span class="k">In plain words</span>
+<p><code>load_config</code> reads the four settings out of the text file, falls back to a sensible
+default for anything missing, and works out where the data folder really is.</p></div>
+
+<div class="box def"><span class="k">What it does</span>
+<p><b>Input:</b> a path to a TOML file. <b>Output:</b> an <code>OfflineResearchConfig</code>
+dataclass with four fields, frozen so nothing downstream can edit it.
+<b>Role:</b> the only place in the package that reads configuration from disk.</p></div>
+
+<div class="box warn"><span class="k">Trap</span>
+<p>Every value has a default, so a typo in a key name silently gives you the default rather than
+an error. Writing <code>horizon_day = 10</code> (missing the "s") leaves the horizon at 5 and the
+run looks fine.</p></div>
+
+<h2 id="loader"><span class="sec-no">03</span>Reading and checking the raw cache</h2>
+
+<h3><code>load_raw_data</code> &mdash; read two files, refuse anything unexpected</h3>
+
+<div class="box gist"><span class="k">In plain words</span>
+<p>It opens the two Parquet files and the manifest, then runs a long list of checks. If anything is
+missing, mismatched, or too short, it stops with a message that names the problem instead of
+letting a broken assumption leak into the maths downstream.</p></div>
+
+<div class="box def"><span class="k">What it does</span>
+<p><b>Input:</b> a folder path, a required symbol, and a minimum number of trading days.
+<b>Output:</b> a <code>RawDataBundle</code> holding the two sorted, date-normalized DataFrames and
+the parsed manifest dictionary. <b>Role:</b> the boundary between untrusted files and trusted
+in-memory frames. Everything after this point assumes clean inputs.</p></div>
+
+<p>The checks, in the order they run:</p>
+
+<div class="scroll">
+<table>
+<thead><tr><th>Check</th><th>Fails when</th></tr></thead>
+<tbody>
+<tr><td>All three files exist</td><td>Any of <code>options_quotes.parquet</code>, <code>underlying_daily.parquet</code>, <code>manifest.json</code> is missing</td></tr>
+<tr><td>Required columns present</td><td>11 option columns or 3 underlying columns missing</td></tr>
+<tr><td>Symbol present in both files</td><td>Filtering to the symbol leaves an empty frame</td></tr>
+<tr><td>Enough coverage</td><td>Fewer unique trading dates than <code>minimum_trading_days</code></td></tr>
+<tr><td>No dates missing from the option file</td><td>The underlying has a date the option file does not</td></tr>
+<tr><td>Manifest keys present</td><td>Any of <code>dataset_version</code>, <code>symbols</code>, <code>date_coverage</code>, <code>files</code> is absent</td></tr>
+<tr><td>Manifest row counts match</td><td>The recorded row count differs from what was read, or is not an integer</td></tr>
+<tr><td>Manifest date range matches</td><td>Recorded start or end differs from the underlying file</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="box data"><span class="k">Sample data</span>
+<div class="io">
+<div><span class="lab">in &mdash; data/raw/options_quotes.parquet, first day</span>
+<pre>symbol trade_date  expiry_date type strike    bid    ask bid_iv ask_iv
+   SPY 2024-01-02  2024-01-17    c  441.8 28.410 29.275 0.1635 0.1735
+   SPY 2024-01-02  2024-01-17    p  441.8  0.678  0.698 0.1755 0.1855
+   SPY 2024-01-02  2024-01-17    c  470.0  0.632  0.652 0.1635 0.1735
+   SPY 2024-01-02  2024-01-17    p  470.0  0.632  0.652 0.1635 0.1735</pre></div>
+<div><span class="lab">out &mdash; RawDataBundle</span>
+<pre>options_quotes    20,880 rows, 522 trade dates
+underlying_daily     522 rows
+manifest symbols  ['SPY']
+coverage          2024-01-02 .. 2025-12-31
+
+40 option rows per day
+  = 4 expiries x 5 strikes x 2 types
+days to expiry each day: 15, 30, 45, 60</pre></div>
+</div>
+<p>The manifest declares 20,880 and 522 rows, which is exactly what the files contain, so the
+consistency check passes.</p></div>
+
+<div class="box warn"><span class="k">Trap</span>
+<p>The row-count check runs <b>after</b> the frames have been filtered down to
+<code>required_symbol</code>. If you ever put two symbols in one file, the manifest count will
+describe the whole file while <code>len(frame)</code> describes one symbol, and the loader will
+reject a perfectly good bundle. The data contract quietly depends on one symbol per file.</p></div>
+
+<div class="box flag"><span class="k">The weakness, stated honestly</span>
+<p>The committed cache is not market data. <code>manifest.json</code> records its own source as
+<code>synthetic_local_generation</code>: a deterministic generator wrote it so the repository
+would run anywhere. Every number produced downstream is evidence that the software works, not
+evidence about SPY.</p></div>
+
+<h2 id="target"><span class="sec-no">04</span>Building the thing to predict</h2>
+
+<h3><code>build_forward_realized_variance_target</code> &mdash; how much the price moves next week</h3>
+
+<pre>    <span class="c"># Daily log return and its square are the building blocks for realized variance.</span>
+    frame["log_return"] = np.log(
+        frame["close"] / frame.groupby("symbol")["close"].shift(1)
+    )
+    frame["squared_log_return"] = frame["log_return"] ** 2
+
+    <span class="c"># First form a trailing h-return sum ending at each row, then move that sum</span>
+    <span class="c"># back by h rows. The value aligned to date t therefore contains returns</span>
+    <span class="c"># ending on t+1 through t+h, never the return ending on t.</span>
+    forward_sum_squared_returns = frame.groupby("symbol")[
+        "squared_log_return"
+    ].transform(
+        lambda series: (
+            series.rolling(window=horizon_days, min_periods=horizon_days)
+            .sum()
+            .shift(-horizon_days)
+        )
+    )</pre>
+
+<div class="box gist"><span class="k">In plain words</span>
+<p>Realized variance is a plain measure of how bumpy the price path was. This function measures
+the bumpiness of the <i>next</i> five trading days and attaches that number to today, so a model
+built from today's information has something to aim at.</p></div>
+
+<div class="box def"><span class="k">What it does</span>
+<p><b>Input:</b> the daily close table, a horizon, an annualization factor, and a trailing window
+length. <b>Output:</b> one row per symbol-date with the forward variance, the logarithm of the
+forward variance, and the trailing 20-day variance. Rows without a complete future window are
+dropped. <b>Role:</b> supplies both the label the model is scored against and one of the six
+features.</p></div>
+
+<div class="box def"><span class="k">The formula</span>
+<p>$$r_t=\ln\!\left(\frac{S_t}{S_{t-1}}\right)$$
+$$RV_{t,t+h}=\sum_{i=1}^{h}r_{t+i}^{\,2}
+\qquad
+\widehat{RV}^{\,\text{ann}}_{t,t+h}=\frac{A}{h}\,RV_{t,t+h}$$
+$$y_t=\ln\!\left(\widehat{RV}^{\,\text{ann}}_{t,t+h}\right)$$</p>
+<p class="fnote">$S_t$ is the closing price on trading day $t$. $r_t$ is the log return earned
+from the close of day $t-1$ to the close of day $t$; it is known at the close of day $t$.
+$h$ is the horizon in trading days, set to 5. $A$ is the annualization factor, set to 252, the
+usual count of trading days in a year. $RV_{t,t+h}$ is the sum of the next $h$ squared returns,
+in units of squared daily return. Multiplying by $A/h$ rescales it to a yearly rate, which is why
+it is comparable to a squared implied volatility. $y_t$ is the column the regression is fitted
+on: taking the logarithm turns a strictly positive, right-skewed quantity into something a linear
+model handles better, and guarantees the forecast stays positive after exponentiating.</p></div>
+
+<div class="box def"><span class="k">The trailing feature, same idea pointed backwards</span>
+<p>$$\text{trailing}RV^{\text{ann}}_t=\frac{A}{w}\sum_{i=0}^{w-1}r_{t-i}^{\,2}$$</p>
+<p class="fnote">$w$ is the trailing window, fixed at 20 trading days in the pipeline. This one
+uses returns up to and including day $t$, so it is fully known at the close of day $t$. It is used
+twice: as the sixth regression feature, and on its own as the persistence benchmark.</p></div>
+
+<div class="box data"><span class="k">Sample data</span>
+<div class="io">
+<div><span class="lab">in &mdash; underlying closes, rows 0 to 5</span>
+<pre>trade_date      close         r
+2024-01-02 470.000000       NaN
+2024-01-03 470.246581  0.000525
+2024-01-04 470.492648  0.000523
+2024-01-05 470.737688  0.000521
+2024-01-08 470.981193  0.000517
+2024-01-09 471.222658  0.000513</pre></div>
+<div><span class="lab">out &mdash; label attached to 2024-01-02</span>
+<pre>annualized_forward_variance_5d
+  6.804186302764308e-05
+
+target_log_annualized_forward_variance_5d
+  -9.595387409452817
+
+check by hand:
+(252/5) * (0.000525^2 + 0.000523^2
+         + 0.000521^2 + 0.000517^2
+         + 0.000513^2)
+= 6.804186302764308e-05      &lt;- matches exactly</pre></div>
+</div>
+<p>Row counts: 522 close observations in, 517 label rows out. The last five days have no complete
+future window, so they are dropped. The trailing 20-day column is empty until 2024-01-30, the
+21st session, because the very first return is undefined.</p></div>
+
+<div class="box why"><span class="k">Why roll first and shift second</span>
+<p>The obvious way to write this is to shift the returns forward and then take a rolling sum. That
+is off by one: the window ending at row $t$ would then include the return that ended on day $t$
+itself, which is already known and is not part of the future. Rolling first produces a completed
+backward sum at every row, and shifting that finished sum back by exactly $h$ rows lands it on the
+date whose future it describes. The repository journal records this as a real bug that was found
+and fixed on 13 July 2026.</p></div>
+
+<div class="box warn"><span class="k">Trap</span>
+<p>The shift is by <b>rows</b>, not by calendar days. That is deliberate: five trading days is the
+intended horizon. But it also means a gap in the input dates silently stretches the label across
+that gap. The loader's requirement that the option file cover every underlying date is the only
+thing standing between you and a silently mis-dated label.</p></div>
+
+<h2 id="features"><span class="sec-no">05</span>The six option-surface features</h2>
+
+<h3><code>build_option_surface_features</code> &mdash; squeeze a day's option chain into one row</h3>
+
+<div class="box gist"><span class="k">In plain words</span>
+<p>On any given day there are dozens of option quotes at different strikes and expiry dates. This
+function boils that whole chain down to five numbers that describe its shape, then joins on the
+trailing-variance column to make six.</p></div>
+
+<div class="box def"><span class="k">What it does</span>
+<p><b>Input:</b> the raw option quote table, the underlying close table, and the target frame
+that carries the trailing-variance column. <b>Output:</b> one row per symbol-date with six feature
+columns. <b>Role:</b> the predictors. On the committed cache this is 522 rows, one per trading
+day.</p></div>
+
+<div class="box def"><span class="k">The building blocks</span>
+<p>$$\sigma^{\text{mid}}_i=\frac{\sigma^{\text{bid}}_i+\sigma^{\text{ask}}_i}{2}
+\qquad
+m_i=\frac{b_i+a_i}{2}
+\qquad
+\text{spread ratio}_i=\frac{a_i-b_i}{m_i}$$
+$$\ell_i=\ln\!\left(\frac{K_i}{S_t}\right)$$</p>
+<p class="fnote">The subscript $i$ indexes one option quote. $b_i$ and $a_i$ are the bid and ask
+prices in dollars; $m_i$ is their midpoint. $\sigma^{\text{bid}}_i$ and $\sigma^{\text{ask}}_i$
+are the implied volatilities that come with the quote, already supplied in the data rather than
+solved for here. $K_i$ is the strike price, $S_t$ the closing price of the underlying that day,
+and $\ell_i$ the log-moneyness: it is zero when the strike equals the spot price, negative below
+it and positive above it. Using the logarithm makes a strike 5&nbsp;per&nbsp;cent below spot and one
+5&nbsp;per&nbsp;cent above spot roughly symmetric around zero.</p></div>
+
+<div class="box def"><span class="k">The five option features</span>
+<p>$$\text{atm\_iv\_30d}_t=\operatorname{mean}\Big\{\sigma^{\text{mid}}_i \;:\; i \in D_{30},\;
+|\ell_i|=\min_{j\in D_{30}}|\ell_j|\Big\}$$
+$$\text{term\_slope}_t=\text{atm\_iv}_t(D_{60})-\text{atm\_iv}_t(D_{30})$$
+$$\text{downside\_skew}_t=\sigma^{\text{mid}}_{p^{-}}-\sigma^{\text{mid}}_{p^{0}}$$
+$$\text{avg\_spread\_ratio}_t=\frac{1}{n_t}\sum_{i=1}^{n_t}\frac{a_i-b_i}{m_i}
+\qquad
+\text{total\_oi}_t=\sum_{i=1}^{n_t}\text{OI}_i$$</p>
+<p class="fnote">$D_{30}$ is the set of quotes on day $t$ whose days-to-expiry is closest to 30;
+$D_{60}$ the same for 60. Both are picked from whatever expiries exist that day, so "30-day" means
+"nearest available to 30 days", not exactly 30. $p^{0}$ is the put whose strike is closest to
+spot; $p^{-}$ is the put whose strike is closest to spot <i>from below</i>, both inside $D_{30}$.
+$n_t$ is the number of surviving quotes on day $t$, across all expiries and strikes. $\text{OI}_i$
+is open interest, the number of contracts outstanding. The term slope is set to missing when the
+nearest-30 and nearest-60 selections land on the same expiry, and the skew is set to missing when
+$p^{0}$ and $p^{-}$ turn out to be the same contract.</p></div>
+
+<div class="box data"><span class="k">Sample data</span>
+<div class="io stack">
+<div><span class="lab">in &mdash; the 30-day slice on 2024-01-02, spot = 470.00</span>
+<pre>type  strike  log_moneyness  bid_iv  ask_iv  mid_iv
+   c   441.8      -0.061875   0.177   0.187   0.182
+   p   441.8      -0.061875   0.189   0.199   0.194
+   c   455.9      -0.030459   0.177   0.187   0.182
+   p   455.9      -0.030459   0.189   0.199   0.194
+   c   470.0       0.000000   0.177   0.187   0.182   &lt;- closest strike to spot
+   p   470.0       0.000000   0.177   0.187   0.182   &lt;- closest strike to spot
+   c   484.1       0.029559   0.177   0.187   0.182
+   p   484.1       0.029559   0.177   0.187   0.182
+   c   498.2       0.058269   0.177   0.187   0.182</pre></div>
+<div><span class="lab">out &mdash; the feature row for 2024-01-02</span>
+<pre>atm_iv_30d                       0.182000   = mean(0.182 call, 0.182 put)
+term_slope_60d_minus_30d         0.027000   = 60-day ATM IV minus 0.182
+downside_skew_30d                0.012000   = 0.194 (put at 455.9) - 0.182 (put at 470.0)
+avg_spread_ratio                 0.030114   averaged over all 40 quotes that day
+total_open_interest             69020.0     summed over all 40 quotes that day
+trailing_annualized_variance_20d     NaN    joined from the target frame; not yet available</pre></div>
+</div>
+<p>Whole-sample fact: 20,880 raw quotes go in, and on this cache <b>zero</b> are rejected by the
+quality filter. 522 feature rows come out, one per trading day.</p></div>
+
+<div class="box def"><span class="k">What the quality filter actually checks</span>
+<p>$$0\le b_i\le a_i,\qquad m_i \gt 0,\qquad 0 \lt \sigma^{\text{bid}}_i\le\sigma^{\text{ask}}_i,
+\qquad K_i \gt 0,\qquad \text{OI}_i\ge 0,\qquad V_i\ge 0$$</p>
+<p class="fnote">$V_i$ is the day's traded volume for that contract, and the option type must be
+one of the two recognized codes, <code>c</code> or <code>p</code>. Every quantity must also be
+finite. These are all <i>single-quote</i> checks: each row is judged alone. Nothing compares one
+strike against another or one expiry against another. See section <a href="#noarb">10</a>.</p></div>
+
+<div class="box why"><span class="k">Why call and put implied volatilities get averaged</span>
+<p>At the strike closest to spot there are usually two quotes, one call and one put. Picking
+whichever one appears first in the file would make the feature depend on row order, which is not
+a property of the market. Averaging them is deterministic and, in a market without frictions, the
+two should agree anyway because a call and a put at the same strike and expiry are linked by
+put-call parity.</p></div>
+
+<div class="box warn"><span class="k">Trap</span>
+<p><code>avg_spread_ratio</code> and <code>total_open_interest</code> are computed over the
+<b>whole day's chain</b>, every expiry and strike, not over the 30-day slice. Change the set of
+expiries in the raw file and these two features move even though nothing about the market changed.
+They are best read as coarse liquidity descriptors of the data bundle, not clean market signals.</p></div>
+
+<div class="box flag"><span class="k">The weakness, stated honestly</span>
+<p>The implied volatilities are taken from the input file as given. Nothing here computes them, so
+nothing here knows what interest rate, dividend assumption, or pricing model produced them. If the
+supplier's convention changes, the features change and no check in this repository would notice.</p></div>
+
+<h2 id="splits"><span class="sec-no">06</span>Splitting the timeline</h2>
+
+<h3><code>build_chronological_split_masks</code> &mdash; early rows train, late rows test, a gap between</h3>
+
+<pre>    train_end = max(1, int(np.floor(total_rows * train_fraction)))
+    validation_end = max(
+        train_end + 1,
+        int(np.floor(total_rows * (train_fraction + validation_fraction))),
+    )
+    <span class="c"># Reserve at least one row for the held-out test segment.</span>
+    validation_end = min(validation_end, total_rows - 1)
+    ...
+    if purge_gap_rows &gt; 0:
+        train_purge_start = max(0, train_end - purge_gap_rows)
+        validation_purge_start = max(train_end, validation_end - purge_gap_rows)
+        labels.loc[sorted_indices[train_purge_start:train_end]] = "purged"
+        labels.loc[sorted_indices[validation_purge_start:validation_end]] = "purged"</pre>
+
+<div class="box gist"><span class="k">In plain words</span>
+<p>Time-ordered data must be split by time, never shuffled. This function labels the earliest 60
+per cent of rows as training, the next 20 per cent as validation, the last 20 per cent as test,
+and then throws away the five rows just before each boundary.</p></div>
+
+<div class="box def"><span class="k">What it does</span>
+<p><b>Input:</b> any frame with a <code>trade_date</code> column, two fractions, and a purge size.
+<b>Output:</b> one label per row, in the caller's original row order, taking one of four values:
+<code>train</code>, <code>validation</code>, <code>test</code>, <code>purged</code>.
+<b>Role:</b> the leakage control. Nothing else in the code decides who sees what.</p></div>
+
+<div class="box def"><span class="k">Why the gap has to be exactly the horizon</span>
+<p>The label at row $t$ is built from returns on days $t+1$ through $t+h$. Two labels
+$h$ or fewer rows apart therefore share at least one return:
+$$\{t+1,\dots,t+h\}\cap\{s+1,\dots,s+h\}\ne\varnothing
+\quad\Longleftrightarrow\quad |t-s| \lt h$$</p>
+<p class="fnote">$t$ and $s$ are two row positions and $h$ the horizon in rows. Read it as: if two
+rows are closer together than the horizon, their two answers are partly the same numbers. Deleting
+the last $h$ rows on the training side of a boundary makes the closest surviving training row and
+the first validation row exactly $h$ apart, so no return appears on both sides. With
+$h=5$ this removes five rows before validation and five before test, ten in all.</p></div>
+
+<div class="box data"><span class="k">Sample data</span>
+<div class="io stack">
+<div><span class="lab">in &mdash; 497 panel rows, purge_gap_rows = 5</span>
+<pre>497 rows spanning 2024-01-30 .. 2025-12-24
+train_fraction = 0.6, validation_fraction = 0.2  (the defaults)
+floor(497 * 0.6) = 298   -> rows 0..297 start as train
+floor(497 * 0.8) = 397   -> rows 298..396 start as validation, 397..496 as test</pre></div>
+<div><span class="lab">out &mdash; the label counts and their date ranges</span>
+<pre>train        293   2024-01-30 .. 2025-03-13
+purged         5   2025-03-14 .. 2025-03-20   &lt;- last 5 train rows deleted
+validation    94   2025-03-21 .. 2025-07-30
+purged         5   2025-07-31 .. 2025-08-06   &lt;- last 5 validation rows deleted
+test         100   2025-08-07 .. 2025-12-24
+                   293 + 5 + 94 + 5 + 100 = 497</pre></div>
+</div>
+<p>Note that the fractions are applied to <b>row counts</b>, not to calendar time. Because the
+panel has one row per trading day with no gaps, the two happen to coincide here.</p></div>
+
+<div class="box why"><span class="k">Why labels come back in the caller's order</span>
+<p>The function sorts by date internally to decide who belongs where, but writes the answers into
+a Series carrying the caller's own index, so it can be assigned straight onto the panel with no
+realignment. Sorting the caller's frame instead would have been a silent trap.</p></div>
+
+<div class="box warn"><span class="k">Trap</span>
+<p>The default is <code>purge_gap_rows=0</code>. A caller who forgets to pass the horizon gets a
+split with no gap and quietly contaminated validation and test scores. That is precisely the bug
+that was sitting in the notebook; see <a href="#fixes">Fixes applied</a>.</p></div>
+
+<h2 id="baselines"><span class="sec-no">07</span>Two benchmarks</h2>
+
+<div class="box gist"><span class="k">In plain words</span>
+<p>Before believing a model, check it beats the two laziest possible forecasts: "next week will be
+like the last month", and "the option market already told me".</p></div>
+
+<pre>def compute_persistence_baseline(feature_target_frame: pd.DataFrame) -&gt; pd.Series:
+    <span class="c"># Persistence uses the same trailing variance feature the ridge model sees.</span>
+    return feature_target_frame["trailing_annualized_variance_20d"].astype(float)
+
+
+def compute_atm_iv_baseline(feature_target_frame: pd.DataFrame) -&gt; pd.Series:
+    <span class="c"># Variance is volatility squared under the standard Black-Scholes convention.</span>
+    atm_iv = feature_target_frame["atm_iv_30d"].astype(float)
+    return atm_iv * atm_iv</pre>
+
+<div class="box def"><span class="k">The formulas</span>
+<p>$$f^{\text{persistence}}_t=\text{trailing}RV^{\text{ann}}_t
+\qquad
+f^{\text{atm}}_t=\left(\text{atm\_iv\_30d}_t\right)^2$$</p>
+<p class="fnote">$f_t$ is a forecast of annualized variance for the window starting after day $t$.
+The persistence forecast simply reuses the trailing 20-day annualized variance. The second
+converts an implied volatility, which is quoted as an annualized standard deviation, into an
+annualized variance by squaring it. Both are in the same units as the label, so they can be scored
+against it directly.</p></div>
+
+<div class="box data"><span class="k">Sample data</span>
+<div class="io">
+<div><span class="lab">in &mdash; panel row for 2024-01-30</span>
+<pre>trailing_annualized_variance_20d  5.2899e-05
+atm_iv_30d                        0.179617</pre></div>
+<div><span class="lab">out &mdash; the two forecasts, against the truth</span>
+<pre>actual        1.9779e-05
+persistence   5.2899e-05    2.7x too high
+atm_iv        3.2262e-02    1600x too high</pre></div>
+</div>
+<p>0.179617 squared is 0.032262. On this synthetic cache the implied volatility sits near 18 per
+cent a year while the price path actually moves at about 0.44 per cent a year in volatility terms,
+so the ATM benchmark is off by three orders of magnitude on every single row.</p></div>
+
+<div class="box flag"><span class="k">The weakness, stated honestly</span>
+<p>Comparing a 30-day implied variance against a 5-day realized variance only makes sense if the
+market's expected variance per year is roughly flat between those two horizons. The methodology
+document says so explicitly. On the committed synthetic cache the comparison is meaningless anyway,
+because the generator did not make the implied volatilities consistent with the price path it
+produced.</p></div>
+
+<h2 id="ridge"><span class="sec-no">08</span>The model</h2>
+
+<h3><code>train_ridge_regression</code> &mdash; a penalized straight line, fitted on the past only</h3>
+
+<pre>    <span class="c"># Keep only rows where every model input and the target are observed.</span>
+    working_frame = feature_target_frame.copy()
+    complete_row_mask = working_frame[model_columns].notna().all(axis=1)
+    working_frame = working_frame.loc[complete_row_mask].reset_index(drop=True)
+    split_labels = split_labels.loc[complete_row_mask].reset_index(drop=True)
+
+    train_mask = split_labels.eq("train")
+    ...
+    x_train = working_frame.loc[train_mask, feature_columns]
+    y_train = working_frame.loc[train_mask, target_column]
+
+    model = Pipeline(
+        steps=[
+            ("scaler", StandardScaler()),
+            ("ridge", Ridge(alpha=ridge_alpha, random_state=0)),
+        ]
+    )
+    model.fit(x_train, y_train)
+
+    fitted_values = model.predict(working_frame[feature_columns])</pre>
+
+<div class="box gist"><span class="k">In plain words</span>
+<p>It puts all six features on a common scale, fits a straight-line relationship to the log of next
+week's variance using only the training rows, and then applies that fitted line to every row so the
+validation and test rows can be scored.</p></div>
+
+<div class="box def"><span class="k">What it does</span>
+<p><b>Input:</b> the panel, the split labels, the list of feature columns, the target column name,
+and the penalty strength. <b>Output:</b> a <code>RidgeTrainingResult</code> holding the fitted
+scikit-learn pipeline, a prediction table with one row per panel row, and a coefficient table.
+<b>Role:</b> the one model in the repository.</p></div>
+
+<div class="box def"><span class="k">The formula, in three steps</span>
+<p><b>Step 1, standardize using training rows only:</b>
+$$z_{j,t}=\frac{x_{j,t}-\bar{x}^{\text{train}}_j}{s^{\text{train}}_j}$$
+<b>Step 2, the objective the fit minimizes:</b>
+$$\hat{\beta}=\arg\min_{\beta}\;\sum_{t\in\text{train}}
+\left(y_t-\beta_0-\sum_{j=1}^{p}\beta_j z_{j,t}\right)^{2}
+\;+\;\alpha\sum_{j=1}^{p}\beta_j^{2}$$
+<b>Step 3, back to variance units for scoring:</b>
+$$f^{\text{ridge}}_t=\exp\!\left(\hat{\beta}_0+\sum_{j=1}^{p}\hat{\beta}_j z_{j,t}\right)$$</p>
+<p class="fnote">$x_{j,t}$ is feature $j$ on day $t$; $p=6$ features. $\bar{x}^{\text{train}}_j$ and
+$s^{\text{train}}_j$ are the mean and standard deviation of feature $j$ <i>computed on the
+training rows only</i>, which is what stops information from the test period leaking backwards.
+$z_{j,t}$ is the standardized feature, in units of training standard deviations.
+$y_t$ is the log of annualized forward variance from section 4.
+$\beta_0$ is the intercept and $\beta_j$ the slope on standardized feature $j$.
+$\alpha$ is the ridge penalty, fixed at 1.0 in the pipeline; the extra
+$\alpha\sum\beta_j^2$ term pulls all slopes toward zero, which stabilizes them when features move
+together. $f^{\text{ridge}}_t$ is the forecast put back on the variance scale.</p></div>
+
+<div class="box data"><span class="k">Sample data</span>
+<div class="io stack">
+<div><span class="lab">in &mdash; what StandardScaler learned from the 293 training rows</span>
+<pre>feature                            train mean      train sd
+atm_iv_30d                        1.669056e-01  1.004151e-02
+term_slope_60d_minus_30d          2.700000e-02  1.000000e+00   &lt;- sd forced to 1
+downside_skew_30d                 1.200000e-02  1.000000e+00   &lt;- sd forced to 1
+avg_spread_ratio                  3.041337e-02  3.106996e-04
+total_open_interest               6.981154e+04  4.556322e+02
+trailing_annualized_variance_20d  1.960046e-05  2.015367e-05</pre></div>
+<div><span class="lab">out &mdash; the fitted coefficients, intercept -11.911445</span>
+<pre>feature                            coefficient
+atm_iv_30d                        1.637903e+00
+term_slope_60d_minus_30d         -9.210852e-17   &lt;- effectively zero
+downside_skew_30d                 0.000000e+00   &lt;- exactly zero
+avg_spread_ratio                  1.719686e+00
+total_open_interest              -4.221626e-01
+trailing_annualized_variance_20d  8.107889e-01
+
+first prediction, 2024-01-30:
+  actual log target  -10.830867
+  predicted log      -10.071921
+  exp(predicted)       4.24e-05</pre></div>
+</div>
+<p>Two coefficients are zero because the synthetic generator made the term slope constant at 0.027
+and the downside skew constant at 0.012 on every single day. A constant column has no standard
+deviation, so scikit-learn sets its scale to 1 rather than dividing by zero, and the standardized
+column is identically zero. A column of zeros carries no information and the ridge penalty drives
+its coefficient to zero. This is the data's fault, not the model's.</p></div>
+
+<div class="box why"><span class="k">Why the scaler lives inside the pipeline</span>
+<p>Wrapping the scaler and the regressor in one <code>Pipeline</code> and calling
+<code>fit</code> on the training rows means the means and standard deviations are learned from
+training data alone. Standardizing the whole panel first and splitting afterwards would leak
+information about the test period into the training features. This is one of the most common
+mistakes in applied forecasting, and the pipeline construct removes the chance of making it.</p></div>
+
+<div class="box warn"><span class="k">Trap</span>
+<p><code>model.predict</code> is called on <b>every</b> row, including the ten purged ones. That is
+harmless because the metric table only loops over <code>train</code>, <code>validation</code> and
+<code>test</code>. But it means <code>predictions.csv</code> contains ten rows that no reported
+number uses, and anyone recomputing a score from that file without filtering on the split column
+will get a slightly different answer.</p></div>
+
+<div class="box flag"><span class="k">The weakness, stated honestly</span>
+<p>The penalty $\alpha$ is fixed at 1.0 in <code>pipeline/offline_research.py</code> and never
+tuned. There is a whole validation split whose usual purpose is choosing that number, and it goes
+unused for that purpose. There is also a retransformation issue: because the fit minimizes squared
+error in log space, exponentiating gives roughly a conditional median in variance space, not a
+conditional mean, so it is not the quantity that minimizes squared error against the level target.
+The methodology document names this problem and does not correct for it.</p></div>
+
+<h2 id="metrics"><span class="sec-no">09</span>Scoring the forecasts</h2>
+
+<pre>def qlike(
+    actual_variance: pd.Series, predicted_variance: pd.Series, epsilon: float = 1e-12
+) -&gt; float:
+    actual = actual_variance.to_numpy(dtype=float)
+    <span class="c"># Floor predicted variance so log and ratio terms stay finite.</span>
+    predicted = np.maximum(predicted_variance.to_numpy(dtype=float), epsilon)
+    return float(np.mean(np.log(predicted) + (actual / predicted)))</pre>
+
+<div class="box def"><span class="k">The three formulas</span>
+<p>$$\text{RMSE}=\sqrt{\frac{1}{n}\sum_{t=1}^{n}\left(y^{\text{lev}}_t-f_t\right)^{2}}
+\qquad
+\text{MAE}=\frac{1}{n}\sum_{t=1}^{n}\left|y^{\text{lev}}_t-f_t\right|$$
+$$\text{QLIKE}=\frac{1}{n}\sum_{t=1}^{n}\left(\ln f_t+\frac{y^{\text{lev}}_t}{f_t}\right)$$</p>
+<p class="fnote">$n$ is the number of rows in one split. $y^{\text{lev}}_t$ is the realized
+annualized forward variance on the ordinary level scale, not the log scale. $f_t$ is the forecast
+variance from one of the three models, floored at $10^{-12}$ so the logarithm and the division stay
+finite. RMSE is root mean squared error and MAE is mean absolute error; both are in units of
+annualized variance, and lower is better. QLIKE is a loss function built for variance forecasting:
+because a forecast enters as a ratio $y/f$ rather than a difference, halving the forecast is
+penalized far more than doubling it, which matches how a variance forecast is actually used. Lower
+is better, and unlike RMSE and MAE it can be negative because of the $\ln f_t$ term.</p></div>
+
+<div class="box warn"><span class="k">Trap</span>
+<p>All three functions convert to NumPy arrays and compare <b>by position</b>. Pass two Series with
+different orderings and you get a confidently wrong number with no warning. In this codebase both
+arguments are always sliced out of the same frame, so they line up, but the functions themselves
+offer no protection.</p></div>
+
+<h2 id="noarb"><span class="sec-no">10</span>The arbitrage conditions this code does not test</h2>
+
+<div class="box warn"><span class="k">Read this before quoting the folder name</span>
+<p>The folder name promises a static arbitrage scanner. To be completely clear: <b>none</b> of the
+four conditions below appear anywhere in <code>src/</code>. There is no put-call parity test, no
+vertical spread test, no butterfly test, no calendar test. The quote filter in section 5 checks
+each quote against itself and never compares two quotes. They are set out here so a reader can see
+exactly what the gap is.</p></div>
+
+<div class="box def"><span class="k">Put-call parity &mdash; not implemented</span>
+<p>$$C_t(K,T)-P_t(K,T)=S_t e^{-qT}-K e^{-rT}$$</p>
+<p class="fnote">$C_t(K,T)$ and $P_t(K,T)$ are the prices of a European call and put with the same
+strike $K$ and the same time to expiry $T$, measured in years. $S_t$ is the spot price of the
+underlying. $r$ is the risk-free interest rate as a continuously compounded annual rate, and $q$
+is the continuously compounded dividend yield of the underlying. If the two sides differ by more
+than transaction costs, a riskless profit exists. Testing this needs a discount curve and a
+dividend forecast, neither of which the raw data contains. Two consequences follow: this repository
+could not run the test even if someone wrote it, and the same missing inputs mean any parity claim
+built on these files would be unfounded.</p></div>
+
+<div class="box def"><span class="k">Vertical spread bounds &mdash; not implemented</span>
+<p>$$0\;\le\;C_t(K_1,T)-C_t(K_2,T)\;\le\;(K_2-K_1)\,e^{-rT}\qquad\text{for }K_1 \lt K_2$$</p>
+<p class="fnote">$K_1$ and $K_2$ are two strikes on the same expiry $T$, with $K_1$ the lower one.
+The left inequality says a call struck lower can never be worth less than a call struck higher:
+call prices must fall as the strike rises. The right inequality caps how fast they may fall. A
+violation is a riskless spread trade.</p></div>
+
+<div class="box def"><span class="k">Butterfly convexity &mdash; not implemented</span>
+<p>$$C_t(K_1,T)-2\,C_t(K_2,T)+C_t(K_3,T)\;\ge\;0
+\qquad\text{for equally spaced }K_1 \lt K_2 \lt K_3$$</p>
+<p class="fnote">Three strikes on one expiry, evenly spaced so that $K_2-K_1=K_3-K_2$. The
+expression on the left is the cost of buying one call at $K_1$, selling two at $K_2$, and buying
+one at $K_3$. That package can never pay out less than zero at expiry, so it can never cost less
+than zero today. Equivalently, the call price must be a convex function of the strike. This is the
+condition most often violated by stale or badly interpolated quotes, and it is the single most
+useful thing a chain scanner can check.</p></div>
+
+<div class="box def"><span class="k">Calendar spread bound &mdash; not implemented</span>
+<p>$$C_t(K,T_1)\;\le\;C_t(K,T_2)\qquad\text{for }T_1 \lt T_2$$</p>
+<p class="fnote">Same strike $K$, two expiries with $T_1$ the nearer one. On a non-dividend-paying
+underlying, more time cannot be worth less, so the longer-dated call must be at least as expensive.
+With dividends the condition has to be restated on forward-moneyness terms rather than on the raw
+strike, which is why a careless calendar test throws false alarms around ex-dividend dates.</p></div>
+
+<div class="box why"><span class="k">Why bid and ask matter here and not upstream</span>
+<p>Every condition above is an inequality on <i>tradeable</i> prices. To claim a violation you must
+buy at the ask and sell at the bid, so the correct test uses the bid on whatever you sell and the
+ask on whatever you buy. Using midpoints will manufacture violations that no one can actually
+trade. This repository only ever uses midpoints, which is fine for describing the shape of a
+surface but would be wrong for an arbitrage claim. It is another reason the code should not be
+described as a scanner.</p></div>
+
+<h2 id="pipeline"><span class="sec-no">11</span>Orchestration and outputs</h2>
+
+<h3><code>run_offline_research</code> &mdash; the eleven steps, in order</h3>
+
+<div class="box def"><span class="k">What it does</span>
+<p><b>Input:</b> a raw folder, an output folder, and the three settings from
+<code>config.toml</code>. <b>Output:</b> a dictionary of four DataFrames in memory, and six files
+on disk. <b>Role:</b> the only function that knows the whole story. Both the command line and the
+blog chart script call it; the notebook reproduces it step by step.</p></div>
+
+<ol>
+<li>Load and validate the raw bundle, requiring at least 40 trading days.</li>
+<li>Build the label frame and the trailing-variance column.</li>
+<li>Build the feature frame, joining the trailing-variance column onto it.</li>
+<li>Merge features and labels on symbol and date with <code>validate="one_to_one"</code>, so a
+duplicated date would raise rather than silently double rows.</li>
+<li>Drop any row missing a feature or either target. 517 rows in, 497 out on this cache.</li>
+<li>Label the splits, passing <code>purge_gap_rows=horizon_days</code>.</li>
+<li>Compute the two baseline forecasts.</li>
+<li>Fit the ridge model and predict on every row.</li>
+<li>Assemble one prediction table, exponentiating the ridge output back to variance units.</li>
+<li>Score all three models on all three splits.</li>
+<li>Write four CSV files, one PNG chart, and <code>summary.md</code>.</li>
+</ol>
+
+<pre>FEATURE_COLUMNS: list[str] = [
+    "atm_iv_30d",
+    "term_slope_60d_minus_30d",
+    "downside_skew_30d",
+    "avg_spread_ratio",
+    "total_open_interest",
+    "trailing_annualized_variance_20d",
+]
+
+<span class="c"># Model name paired with its variance-level prediction column in the output frame.</span>
+MODEL_PREDICTION_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("persistence", "persistence_prediction"),
+    ("atm_iv", "atm_iv_prediction"),
+    ("ridge", "ridge_prediction_variance"),
+)</pre>
+
+<div class="box data"><span class="k">Sample data</span>
+<div class="io stack">
+<div><span class="lab">in &mdash; the command</span>
+<pre>uv run python -m options_rv.cli --config config.toml --output-dir outputs/demo_run</pre></div>
+<div><span class="lab">out &mdash; what appears on disk</span>
+<pre>outputs/demo_run/
+├── summary.md                          markdown table of the 9 metric rows
+├── tables/
+│   ├── feature_target_panel.csv        497 rows x 10 columns
+│   ├── predictions.csv                 497 rows, actual + split + 3 forecasts
+│   ├── evaluation_metrics.csv          9 rows: 3 splits x 3 models
+│   └── ridge_coefficients.csv          6 rows
+└── figures/
+    └── prediction_scatter.png          ridge forecast against realized, all rows</pre></div>
+</div>
+<p>Wall-clock time for a full run on the committed cache: a few seconds. The 18 tests take about
+1.5 seconds.</p></div>
+
+<div class="box warn"><span class="k">Trap</span>
+<p>Step 9 assigns the ridge predictions with
+<code>ridge_result.predictions["prediction"].to_numpy()</code>, a positional assignment that
+assumes the model function did not drop any rows. It is safe only because step 5 already removed
+every row the model would have dropped. Weaken the step-5 dropna and this line will either raise a
+length error or, worse, misalign.</p></div>
+
+<div class="box warn"><span class="k">Trap</span>
+<p>The scatter chart plots every row in one colour, training and test together, with the legend
+"Ridge predictions". It looks like an out-of-sample picture and is not one.</p></div>
+
+<h2 id="refresh"><span class="sec-no">12</span>The one-time database refresh</h2>
+
+<div class="box gist"><span class="k">In plain words</span>
+<p>A separate, optional script that talks to a ClickHouse database, pulls fresh SPY option and price
+data, and rewrites the three files in <code>data/raw/</code>. Nothing else in the project uses it.</p></div>
+
+<div class="box def"><span class="k">What it does</span>
+<p><b>Input:</b> connection details from the environment or the command line, a symbol, and a date
+range. <b>Output:</b> the two Parquet files plus a regenerated <code>manifest.json</code>.
+<b>Role:</b> refills the offline cache. Requires network access and credentials.</p></div>
+
+<div class="box def"><span class="k">The filter the query applies at the source</span>
+<p>$$7\;\le\;\text{expiry\_date}-\text{trade\_date}\;\le\;90\ \text{calendar days},
+\qquad \text{expiry\_date} \gt \text{trade\_date}$$</p>
+<p class="fnote">This is what keeps the exported file small. It also means the 60-day feature is
+always available while anything longer dated never is, which quietly fixes the shape of the term
+structure the features can see.</p></div>
+
+<div class="box why"><span class="k">Why parameterized queries</span>
+<p>The symbol and dates are passed as ClickHouse query parameters
+(<code>{symbol:String}</code>, <code>{start_date:Date}</code>) rather than pasted into the SQL
+string. That is both safer and lets the server type-check the values.</p></div>
+
+<div class="box flag"><span class="k">Could not be run for this page</span>
+<p>This is the one part of the repository with no sample data on this page. Running it needs a
+ClickHouse host with a <code>firstrate.options</code> table and working credentials, neither of
+which is available here. Everything else on this page was executed for real.</p></div>
+
+<h2 id="results"><span class="sec-no">13</span>What the run actually produced</h2>
+
+<p>The table below is <code>outputs/tables/evaluation_metrics.csv</code>, copied from an actual run
+on 10 August 2026. Lower is better in all three columns.</p>
+
+<div class="scroll">
+<table>
+<thead><tr><th>Split</th><th>Model</th><th class="n">RMSE</th><th class="n">MAE</th><th class="n">QLIKE</th></tr></thead>
+<tbody>
+<tr><td>train</td><td>persistence</td><td class="n">1.7453e-05</td><td class="n">1.3363e-05</td><td class="n">-9.984133</td></tr>
+<tr><td>train</td><td>atm_iv</td><td class="n">2.8141e-02</td><td class="n">2.7940e-02</td><td class="n">-3.583622</td></tr>
+<tr><td>train</td><td>ridge</td><td class="n">1.9926e-05</td><td class="n">1.2953e-05</td><td class="n"><span class="pass">-10.067420</span></td></tr>
+<tr><td>validation</td><td>persistence</td><td class="n"><span class="pass">1.8377e-05</span></td><td class="n"><span class="pass">1.4777e-05</span></td><td class="n"><span class="pass">-9.851681</span></td></tr>
+<tr><td>validation</td><td>atm_iv</td><td class="n">2.6119e-02</td><td class="n">2.5975e-02</td><td class="n">-3.654060</td></tr>
+<tr><td>validation</td><td>ridge</td><td class="n">2.6911e-05</td><td class="n">1.8730e-05</td><td class="n">-7.779522</td></tr>
+<tr><td>test</td><td>persistence</td><td class="n"><span class="pass">1.7612e-05</span></td><td class="n"><span class="pass">1.4279e-05</span></td><td class="n"><span class="pass">-9.582540</span></td></tr>
+<tr><td>test</td><td>atm_iv</td><td class="n">3.0599e-02</td><td class="n">3.0491e-02</td><td class="n">-3.492651</td></tr>
+<tr><td>test</td><td>ridge</td><td class="n">1.9925e-05</td><td class="n">1.5107e-05</td><td class="n">-7.447701</td></tr>
+</tbody>
+</table>
+</div>
+<p class="fnote">Green marks the best model within each split-metric combination.</p>
+
+<div class="box why"><span class="k">What the table says</span>
+<p>The ridge model wins on training QLIKE and loses on everything out of sample. Persistence is the
+best model on the validation and test splits by all three measures. The ATM implied-volatility
+benchmark is off by roughly three orders of magnitude everywhere, because the synthetic generator
+produced implied volatilities near 18 per cent a year alongside a price path that barely moves.
+This is the honest result: on this data, the option features add nothing over simply carrying last
+month's variance forward.</p></div>
+
+<div class="box flag"><span class="k">What this table is not</span>
+<p>It is not a finding about SPY. The inputs are synthetic. The correct reading is: the software
+runs end to end, the splits behave, the metrics compute, and the harness would detect an
+improvement if one existed. Any claim about the options market needs real data.</p></div>
+
+<h2 id="fixes"><span class="sec-no">14</span>Fixes applied</h2>
+
+<p>Five defects were found while reading the code and were fixed. Nothing else was changed; no
+style refactoring was done.</p>
+
+<div class="scroll">
+<table>
+<thead><tr><th>File</th><th>Defect</th><th>Fix</th></tr></thead>
+<tbody>
+<tr>
+<td><code>notebooks/options_rv_pipeline_demo.ipynb</code></td>
+<td><span class="chip c-veto">leakage</span> Cell 11 called <code>build_chronological_split_masks(panel)</code> and so used the default <code>purge_gap_rows=0</code>, while the notebook's own text one cell earlier promised a five-row purge and the command-line pipeline applied one. Overlapping five-day labels straddled both split boundaries, so the notebook's validation and test scores were contaminated and did not match the pipeline's.</td>
+<td>Pass <code>purge_gap_rows=5</code>. The notebook now reports 293 / 94 / 100 / 10 and metrics identical to the command-line run, to six decimal places.</td>
+</tr>
+<tr>
+<td><code>src/options_rv/cli.py</code></td>
+<td><span class="chip c-bug">broken path</span> <code>raw_dir = "data/raw"</code> from <code>config.toml</code> was turned into a <code>Path</code> and used as-is, so it resolved against whatever folder you happened to be in. The installed <code>options-rv</code> console script, which the README documents, failed with "Missing required raw file: options_quotes.parquet" from anywhere except the repository root.</td>
+<td>Resolve a relative <code>raw_dir</code> against the folder holding the config file. Verified by running the pipeline successfully from an unrelated directory, which previously raised.</td>
+</tr>
+<tr>
+<td><code>notebooks/options_rv_pipeline_demo.ipynb</code></td>
+<td><span class="chip c-drop">broken maths</span> Two markdown cells contained <code>\text</code> and <code>\times</code> written with a single backslash inside the notebook's JSON. JSON reads <code>\t</code> as a tab character, so the rendered markdown showed a tab followed by <code>ext{annualized RV}</code> and <code>imes</code> instead of the intended formula.</td>
+<td>Escape both as <code>\\text</code> and <code>\\times</code> in the JSON. No tab characters remain in any markdown cell.</td>
+</tr>
+<tr>
+<td><code>src/options_rv/io/local_loader.py</code></td>
+<td><span class="chip c-drop">wrong error</span> <code>int(file_entry.get("rows"))</code> raised a bare <code>TypeError</code> when a manifest omitted the documented <code>rows</code> key, instead of the module's own <code>RawDataValidationError</code>. The module's stated purpose is explicit, user-facing validation errors.</td>
+<td>Check for a genuine integer first and raise <code>RawDataValidationError</code> naming the file and the offending value.</td>
+</tr>
+<tr>
+<td><code>src/options_rv/io/clickhouse_export.py</code></td>
+<td><span class="chip c-drop">resource leak</span> The ClickHouse client was created and never closed. A query that raised left the HTTP connection pool open for the life of the process.</td>
+<td>Wrap the two queries in <code>try ... finally</code> and call <code>client.close()</code>.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="box why"><span class="k">One environment repair, not a code change</span>
+<p>The checked-out virtual environment could not import NumPy or SciPy: their compiled extension
+modules were broken, so <code>import numpy</code> failed with a misleading message about "an older
+version of numpy". Nothing could be run until <code>uv sync --reinstall</code> rebuilt the
+environment. This was a local installation problem, not a defect in the repository, and no file was
+changed for it.</p></div>
+
+<div class="box def"><span class="k">Considered and deliberately not changed</span>
+<p>Four tunable values are hard-coded in <code>pipeline/offline_research.py</code> rather than read
+from <code>config.toml</code>: the ridge penalty <code>1.0</code>, the trailing window
+<code>20</code>, the minimum coverage requirement <code>40</code>, and the two days-to-expiry
+targets 30 and 60 that come from the feature function's defaults. Moving them into configuration
+would be a genuine improvement, but it is a design change rather than a defect fix, so it was left
+alone and is recorded here instead.</p></div>
+
+<h2 id="callgraph"><span class="sec-no">15</span>Call graph</h2>
+
+<pre>cli.main()
+├── cli.load_config(config_path)                         <span class="c"># reads config.toml</span>
+└── pipeline.run_offline_research(...)
+    ├── io.local_loader.load_raw_data(...)
+    │   ├── _require_file            x3
+    │   ├── _read_manifest
+    │   ├── _require_columns         x2
+    │   ├── _normalize_date_columns  x2
+    │   └── _validate_manifest
+    │       └── _validate_manifest_file_entry            x2
+    ├── targets.build_forward_realized_variance_target(...)
+    │   ├── _validate_underlying_contract
+    │   └── _target_column_names
+    ├── features.build_option_surface_features(...)
+    │   ├── _validate_option_contract
+    │   ├── _validate_underlying_contract
+    │   ├── _filter_valid_quotes
+    │   └── _build_feature_row_for_day                   <span class="c"># once per trading day</span>
+    │       ├── _slice_nearest_dte                       x2
+    │       ├── _mid_iv_at_closest_strike                x3
+    │       ├── _below_spot_put_mid_iv
+    │       └── _is_distinct_downside_and_atm_put
+    ├── evaluation.build_chronological_split_masks(...)
+    ├── models.compute_persistence_baseline(...)
+    ├── models.compute_atm_iv_baseline(...)
+    ├── models.train_ridge_regression(...)
+    │   └── sklearn Pipeline: StandardScaler -&gt; Ridge
+    ├── _build_metric_table
+    │   ├── evaluation.root_mean_squared_error           <span class="c"># 9 times: 3 splits x 3 models</span>
+    │   ├── evaluation.mean_absolute_error
+    │   └── evaluation.qlike
+    ├── _write_prediction_scatter_figure
+    └── _write_markdown_summary
+
+scripts/refresh_raw_from_clickhouse.py  <span class="c"># separate tree, never reached from cli</span>
+└── io.clickhouse_export.export_raw_data_from_clickhouse(...)
+    ├── _write_parquet_bundle
+    └── _build_manifest</pre>
+
+<h2 id="edge"><span class="sec-no">16</span>Edge cases</h2>
+
+<div class="scroll">
+<table>
+<thead><tr><th>Situation</th><th>What would go wrong</th><th>What handles it</th></tr></thead>
+<tbody>
+<tr><td>A raw file is missing</td><td>An opaque pandas or pyarrow error deep in the stack</td><td><code>_require_file</code> raises <code>RawDataValidationError</code> naming the file</td></tr>
+<tr><td>The manifest disagrees with the file</td><td>You would report results on data you think is something else</td><td><code>_validate_manifest</code> compares row counts and the date range and refuses to continue</td></tr>
+<tr><td>The manifest omits its <code>rows</code> key</td><td>A bare <code>TypeError</code> instead of a useful message</td><td>Fixed: an explicit <code>RawDataValidationError</code> (see <a href="#fixes">Fixes applied</a>)</td></tr>
+<tr><td>The option file is missing a trading day the underlying has</td><td>A feature row would vanish and the panel would silently shrink</td><td>The loader raises and names the first missing date</td></tr>
+<tr><td>The very first return is undefined</td><td>NaN would poison every rolling sum touching it</td><td><code>min_periods</code> equal to the window forces the first complete sums to be genuinely complete</td></tr>
+<tr><td>The last five days have no future</td><td>Labels built from a partial window would look real</td><td><code>dropna</code> on the forward variance column removes them</td></tr>
+<tr><td>The nearest-30 and nearest-60 expiries collide</td><td>The term slope would be exactly zero and look like a real reading</td><td>Explicit <code>atm_30_selected_dte != atm_60_selected_dte</code> test; otherwise the feature is missing</td></tr>
+<tr><td>The at-the-money put is also the nearest below-spot put</td><td>The skew would be exactly zero and look like a real reading</td><td><code>_is_distinct_downside_and_atm_put</code> compares strike and expiry; otherwise the feature is missing</td></tr>
+<tr><td>A mid price of zero</td><td>The spread ratio would be infinite</td><td>The quality filter requires a positive mid; any surviving infinities are replaced with NaN before averaging</td></tr>
+<tr><td>Every quote fails the filter</td><td>An empty frame flowing into the grouping loop</td><td><code>_filter_valid_quotes</code> raises with a clear message</td></tr>
+<tr><td>A feature that never varies</td><td>Dividing by a zero standard deviation</td><td>scikit-learn sets that scale to 1; the standardized column is all zeros and the coefficient goes to zero</td></tr>
+<tr><td>A forecast at or below zero</td><td><code>log(0)</code> and division by zero inside QLIKE</td><td>The forecast is floored at $10^{-12}$; the ridge forecast is an exponential and so positive by construction</td></tr>
+<tr><td>Purge larger than a segment</td><td>An empty training or validation set, discovered much later</td><td><code>build_chronological_split_masks</code> raises up front</td></tr>
+<tr><td>A duplicated symbol-date</td><td>Silently doubled panel rows</td><td>Both merges pass <code>validate="one_to_one"</code> or <code>"many_to_one"</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="traps"><span class="sec-no">17</span>Gotchas and traps</h2>
+
+<div class="scroll">
+<table>
+<thead><tr><th>Construct</th><th>What it does</th><th>The trap</th></tr></thead>
+<tbody>
+<tr><td><code>.rolling(h).sum().shift(-h)</code></td><td>Builds a forward-looking sum with only backward-looking machinery</td><td>Swap the order and you include today's return in tomorrow's answer. This exact bug was in the repository once.</td></tr>
+<tr><td><code>min_periods=h</code></td><td>Refuses to produce a sum from a partial window</td><td>The pandas default is <code>min_periods=window</code> for a fixed integer window, but writing it out is what makes the intent reviewable.</td></tr>
+<tr><td><code>groupby("symbol").transform(...)</code></td><td>Applies the rolling window within each symbol</td><td>With one symbol it looks like pointless ceremony. Remove it and a second symbol silently borrows the first one's returns across the join.</td></tr>
+<tr><td><code>Pipeline([scaler, ridge])</code></td><td>Learns the scaling from training rows only</td><td>Scaling before splitting is the classic leak. The pipeline makes it structurally impossible.</td></tr>
+<tr><td><code>purge_gap_rows</code> defaults to 0</td><td>No gap unless you ask for one</td><td>A safe default would have been the horizon. Forgetting the argument gives a contaminated score with no warning.</td></tr>
+<tr><td><code>validate="one_to_one"</code></td><td>Makes pandas check the join keys are unique on both sides</td><td>Cheap insurance. Without it a duplicated date silently doubles rows and every metric shifts.</td></tr>
+<tr><td><code>np.isclose</code> on log-moneyness</td><td>Finds every quote tied at the closest strike, so calls and puts both come in</td><td>An exact <code>==</code> would sometimes miss one leg because of floating-point noise, making the feature depend on rounding.</td></tr>
+<tr><td><code>np.exp(log_prediction)</code></td><td>Puts the forecast back on the variance scale</td><td>Exponentiating a least-squares fit in log space gives roughly a median, not a mean. It is a defensible choice for absolute error and the wrong one for squared error.</td></tr>
+<tr><td>Midpoint prices everywhere</td><td>Simple, symmetric, and stable</td><td>Fine for describing a surface. Never use a midpoint to claim an arbitrage: you cannot trade at the midpoint.</td></tr>
+<tr><td><code>.to_numpy()</code> in the metrics</td><td>Compares two Series by position</td><td>Different orderings give a wrong answer silently. Both arguments happen to come from the same frame.</td></tr>
+<tr><td>Every config key has a default</td><td>A missing file still runs</td><td>A misspelled key is indistinguishable from an absent one.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="questions"><span class="sec-no">18</span>If someone points at a line</h2>
+
+<div class="scroll">
+<table>
+<thead><tr><th>Question</th><th>Answer</th></tr></thead>
+<tbody>
+<tr><td>"Where exactly is look-ahead prevented?"</td><td>Three places. The label uses <code>.shift(-h)</code> applied to an already-completed backward sum, so day $t$'s answer contains only returns from $t+1$ to $t+h$. The scaler and regressor sit in one pipeline fitted on training rows only. And <code>purge_gap_rows=horizon_days</code> deletes the five rows before each boundary so no return appears on both sides.</td></tr>
+<tr><td>"Why does the target module also produce a feature?"</td><td>The trailing 20-day variance is built from the same return series as the label. Computing it once, in the same function, guarantees both use identical returns and identical annualization. The feature module joins it on rather than recomputing it.</td></tr>
+<tr><td>"Why 497 rows and not 522?"</td><td>522 trading days, minus 5 with no complete future window, minus 20 with no complete trailing window. 522 &minus; 5 &minus; 20 = 497.</td></tr>
+<tr><td>"What happens if I set <code>horizon_days = 10</code>?"</td><td>Three things at once. The label sums ten future returns instead of five. Every column name changes from <code>..._5d</code> to <code>..._10d</code>. And the purge widens to ten rows on each side, so twenty rows leave the evaluation instead of ten. The panel loses five more rows at the end as well.</td></tr>
+<tr><td>"Why is the term-slope coefficient exactly zero?"</td><td>The synthetic generator made that feature constant at 0.027 on all 522 days. A constant has no standard deviation, scikit-learn sets its scale to 1, the standardized column becomes all zeros, and the penalty drives the coefficient to zero. On real data it would not be zero.</td></tr>
+<tr><td>"Is the ridge model any good?"</td><td>No. Persistence beats it on both the validation and the test splits by all three measures. The ridge model only wins on the training split, which is the signature of fitting noise.</td></tr>
+<tr><td>"Why is QLIKE negative?"</td><td>Because of the $\ln f_t$ term. Variance here is around $2\times10^{-5}$, whose logarithm is about $-10.8$. QLIKE is a relative loss for ranking models, not an absolute quantity, so only the comparison between rows matters.</td></tr>
+<tr><td>"Can I trust these numbers?"</td><td>As evidence that the software works, yes: they were produced by an actual run and the notebook reproduces them exactly. As evidence about SPY, no. The manifest says the inputs are synthetic.</td></tr>
+<tr><td>"How long does it take?"</td><td>A few seconds for a full run; roughly 1.5 seconds for all 18 tests. The slowest part is the per-day Python loop in the feature builder, which runs 522 times.</td></tr>
+<tr><td>"Does it need a database?"</td><td>Not for anything on the normal path. Only <code>scripts/refresh_raw_from_clickhouse.py</code> connects, and it is never called by the command line, the notebook, or the tests.</td></tr>
+<tr><td>"Where would a real arbitrage scanner go?"</td><td>Beside <code>_filter_valid_quotes</code>, as a second stage that groups by expiry and compares strikes. It would need a discount curve and dividend assumptions for parity, and bid and ask prices rather than midpoints. None of that exists here.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="limits"><span class="sec-no">19</span>Limitations, stated honestly</h2>
+
+<div class="box flag"><span class="k">The data is not real</span>
+<p><code>manifest.json</code> names its own source as <code>synthetic_local_generation</code>. Every
+number on this page is software evidence. Two features are constant, the implied volatilities are
+inconsistent with the price path, and the price path is far too smooth. No conclusion about the
+options market can survive on this input.</p></div>
+
+<div class="box flag"><span class="k">The name does not match the code</span>
+<p>Anyone finding this folder by its name will expect a chain scanner. The code forecasts variance.
+The README and the guide files say so, but the folder name, and the note file that inspired it,
+still point the wrong way.</p></div>
+
+<div class="box flag"><span class="k">Nothing checks quote timing</span>
+<p>The raw files record a trade date and nothing finer. There is no way to tell whether an option
+snapshot was taken before or after the underlying close. If option quotes are stamped after the
+close, the features silently contain a few minutes of information the label should not have seen.
+The methodology document raises this and no code addresses it.</p></div>
+
+<div class="box flag"><span class="k">The validation split is not used for what it is for</span>
+<p>The ridge penalty is fixed at 1.0 and never tuned. Nothing selects features, chooses a horizon,
+or picks a window using the validation split. It is only reported on, which means the test split is
+the only genuinely untouched segment and the validation numbers add little.</p></div>
+
+<div class="box flag"><span class="k">One symbol, one horizon, one model, one seed</span>
+<p>There is no cross-symbol check, no robustness sweep across neighbouring horizons, no rolling
+re-fit, and no confidence interval on any metric. Three models scored on 100 test rows cannot
+distinguish skill from luck, and the code makes no attempt to.</p></div>
+
+<div class="box flag"><span class="k">Costs and tradeability are entirely absent</span>
+<p>Nothing here converts a variance forecast into a position, a hedge, or a profit-and-loss.
+There is no bid-ask cost, no margin, and no capacity. The output is a forecast comparison, and
+calling it a strategy result would be wrong.</p></div>
+
+<h2 id="verify"><span class="sec-no">20</span>How this page was verified</h2>
+
+<div class="scroll">
+<table>
+<thead><tr><th>Check</th><th>How it works</th><th>What it catches</th></tr></thead>
+<tbody>
+<tr><td>Full test suite</td><td><code>uv run pytest -q</code></td><td>18 passed after the fixes, same as before them</td></tr>
+<tr><td>End-to-end pipeline run</td><td><code>uv run python -m options_rv.cli --config config.toml --output-dir ...</code></td><td>All six artifacts written; every metric on this page came from that run</td></tr>
+<tr><td>Path fix proven</td><td>Ran the module from an unrelated working directory</td><td>Raised "Missing required raw file" before the fix; completes after it</td></tr>
+<tr><td>Notebook executed top to bottom</td><td><code>uv run jupyter nbconvert --to notebook --execute</code></td><td>Reproduces 293 / 94 / 100 / 10 and metrics identical to the command line, confirming the purge fix</td></tr>
+<tr><td>Label checked by hand</td><td>Recomputed $(252/5)\sum r^2$ for 2024-01-02 from the raw closes</td><td>Matched the code to every digit: 6.804186302764308e-05</td></tr>
+<tr><td>Feature checked by hand</td><td>Recomputed the ATM implied volatility and the skew from the printed 30-day slice</td><td>0.182 and 0.012 both reproduced from the raw bid and ask implied volatilities</td></tr>
+<tr><td>Row arithmetic checked</td><td>522 &minus; 5 &minus; 20 = 497, and 293 + 5 + 94 + 5 + 100 = 497</td><td>Confirms nothing is silently dropped between stages</td></tr>
+<tr><td>This page parsed</td><td>Python's <code>html.parser</code> over the finished file</td><td>No unclosed tags; no raw angle brackets inside any formula</td></tr>
+</tbody>
+</table>
+</div>
+
+<p class="foot">Companion documents: <code>README.md</code> for scope and commands,
+<code>docs/reference/methodology.md</code> for the formal definitions,
+<code>docs/reference/data_contract.md</code> for the raw-file schema, and the
+<code>GUIDE_*.md</code> files for folder-level orientation. Every number on this page came from
+running the code on the committed data on 10 August 2026.</p>
+
+</div>
+</body>
+</html>

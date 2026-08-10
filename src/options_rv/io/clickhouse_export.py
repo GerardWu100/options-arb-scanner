@@ -6,9 +6,9 @@ Use it only when refreshing committed raw files under ``data/raw``.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
-import json
 
 import clickhouse_connect
 import pandas as pd
@@ -107,8 +107,15 @@ def export_raw_data_from_clickhouse(
         "end_date": end_date,
     }
 
-    options_result = client.query_df(options_query, parameters=query_parameters)
-    underlying_result = client.query_df(underlying_query, parameters=query_parameters)
+    # Close the client even when a query raises, so a failed refresh does not
+    # leave the HTTP connection pool open for the rest of the process.
+    try:
+        options_result = client.query_df(options_query, parameters=query_parameters)
+        underlying_result = client.query_df(
+            underlying_query, parameters=query_parameters
+        )
+    finally:
+        client.close()
 
     _write_parquet_bundle(
         output_raw_dir=output_raw_dir,
@@ -213,12 +220,12 @@ def _build_manifest(
         },
         "files": {
             "options_quotes.parquet": {
-                "rows": int(len(options)),
+                "rows": len(options),
                 "columns": list(options.columns),
                 "compression": "zstd",
             },
             "underlying_daily.parquet": {
-                "rows": int(len(underlying)),
+                "rows": len(underlying),
                 "columns": list(underlying.columns),
                 "compression": "zstd",
             },
