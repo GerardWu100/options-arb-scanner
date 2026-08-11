@@ -5,7 +5,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
-
 from options_rv.features.option_surface import build_option_surface_features
 
 

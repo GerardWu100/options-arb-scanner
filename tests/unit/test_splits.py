@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pandas as pd
-
 from options_rv.evaluation.splits import build_chronological_split_masks
 
 

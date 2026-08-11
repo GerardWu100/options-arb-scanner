@@ -78,11 +78,11 @@ def build_forward_realized_variance_target(
     forward_sum_squared_returns = frame.groupby("symbol")[
         "squared_log_return"
     ].transform(
-        lambda series: series.rolling(
-            window=horizon_days, min_periods=horizon_days
+        lambda series: (
+            series.rolling(window=horizon_days, min_periods=horizon_days)
+            .sum()
+            .shift(-horizon_days)
         )
-        .sum()
-        .shift(-horizon_days)
     )
     trailing_sum_squared_returns = frame.groupby("symbol")[
         "squared_log_return"

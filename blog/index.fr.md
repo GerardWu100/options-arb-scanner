@@ -43,14 +43,12 @@ $$
 Chaque rendement de cette cible se termine après $t$. L'implémentation forme maintenant une somme glissante complète, puis la recule de $h$ lignes :
 
 ```python
-forward_sum_squared_returns = frame.groupby("symbol")[
-    "squared_log_return"
-].transform(
-    lambda series: series.rolling(
-        window=horizon_days, min_periods=horizon_days
+forward_sum_squared_returns = frame.groupby("symbol")["squared_log_return"].transform(
+    lambda series: (
+        series.rolling(window=horizon_days, min_periods=horizon_days)
+        .sum()
+        .shift(-horizon_days)
     )
-    .sum()
-    .shift(-horizon_days)
 )
 ```
 

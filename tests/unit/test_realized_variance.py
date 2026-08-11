@@ -6,7 +6,6 @@ import math
 
 import numpy as np
 import pandas as pd
-
 from options_rv.targets.realized_variance import build_forward_realized_variance_target
 
 

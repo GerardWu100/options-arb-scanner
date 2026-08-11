@@ -43,14 +43,12 @@ $$
 Every return in this label ends after $t$. The implementation now forms a completed trailing sum and moves the sum back by $h$ rows:
 
 ```python
-forward_sum_squared_returns = frame.groupby("symbol")[
-    "squared_log_return"
-].transform(
-    lambda series: series.rolling(
-        window=horizon_days, min_periods=horizon_days
+forward_sum_squared_returns = frame.groupby("symbol")["squared_log_return"].transform(
+    lambda series: (
+        series.rolling(window=horizon_days, min_periods=horizon_days)
+        .sum()
+        .shift(-horizon_days)
     )
-    .sum()
-    .shift(-horizon_days)
 )
 ```
 

@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 
 import pandas as pd
-
 from options_rv.pipeline.offline_research import run_offline_research
 
 
@@ -69,7 +68,7 @@ def _write_bundle_for_pipeline(raw_dir: Path) -> None:
         },
         "files": {
             "options_quotes.parquet": {
-                "rows": int(len(options_quotes)),
+                "rows": len(options_quotes),
                 "columns": [
                     "symbol",
                     "trade_date",
@@ -86,7 +85,7 @@ def _write_bundle_for_pipeline(raw_dir: Path) -> None:
                 "compression": "zstd",
             },
             "underlying_daily.parquet": {
-                "rows": int(len(underlying_daily)),
+                "rows": len(underlying_daily),
                 "columns": ["symbol", "trade_date", "close"],
                 "compression": "zstd",
             },

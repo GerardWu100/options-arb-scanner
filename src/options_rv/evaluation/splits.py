@@ -72,7 +72,5 @@ def build_chronological_split_masks(
         train_purge_start = max(0, train_end - purge_gap_rows)
         validation_purge_start = max(train_end, validation_end - purge_gap_rows)
         labels.loc[sorted_indices[train_purge_start:train_end]] = "purged"
-        labels.loc[
-            sorted_indices[validation_purge_start:validation_end]
-        ] = "purged"
+        labels.loc[sorted_indices[validation_purge_start:validation_end]] = "purged"
     return labels

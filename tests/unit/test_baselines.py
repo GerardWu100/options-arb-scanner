@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-
-from options_rv.models.baselines import compute_atm_iv_baseline
-from options_rv.models.baselines import compute_persistence_baseline
+from options_rv.models.baselines import (
+    compute_atm_iv_baseline,
+    compute_persistence_baseline,
+)
 
 
 def test_persistence_baseline_uses_trailing_variance_level() -> None:

@@ -61,9 +61,7 @@ def train_ridge_regression(
         column for column in model_columns if column not in feature_target_frame.columns
     ]
     if missing_columns:
-        raise ValueError(
-            f"Model columns are missing: {', '.join(missing_columns)}"
-        )
+        raise ValueError(f"Model columns are missing: {', '.join(missing_columns)}")
 
     # Keep only rows where every model input and the target are observed.
     working_frame = feature_target_frame.copy()

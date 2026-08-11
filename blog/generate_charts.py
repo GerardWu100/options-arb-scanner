@@ -12,9 +12,7 @@ from tempfile import TemporaryDirectory
 
 import matplotlib.pyplot as plt
 import pandas as pd
-
 from options_rv.pipeline.offline_research import run_offline_research
-
 
 BLOG_ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = BLOG_ROOT.parent
@@ -53,9 +51,7 @@ def generate_blog_evidence() -> None:
     predictions = results["predictions"].copy()
     predictions["trade_date"] = pd.to_datetime(predictions["trade_date"])
     test_predictions = predictions.loc[predictions["split"] == "test"].copy()
-    test_metrics = results["metrics"].loc[
-        results["metrics"]["split"] == "test"
-    ].copy()
+    test_metrics = results["metrics"].loc[results["metrics"]["split"] == "test"].copy()
 
     # Freeze the exact rows behind the article so a reader can audit each plot.
     test_predictions.to_csv(DATA_DIR / "test_predictions.csv", index=False)
@@ -85,9 +81,7 @@ def _plot_test_forecasts(test_predictions: pd.DataFrame) -> None:
         "Ridge": "ridge_prediction_variance",
     }
 
-    figure, axis = plt.subplots(
-        figsize=(13, 7), dpi=180, constrained_layout=True
-    )
+    figure, axis = plt.subplots(figsize=(13, 7), dpi=180, constrained_layout=True)
     figure.patch.set_facecolor("#071426")
     axis.set_facecolor("#0b1c31")
 
@@ -154,9 +148,7 @@ def _plot_relative_mae(test_metrics: pd.DataFrame) -> None:
     }
     metric_frame["label"] = metric_frame["model"].map(display_names)
 
-    figure, axis = plt.subplots(
-        figsize=(10, 6.5), dpi=180, constrained_layout=True
-    )
+    figure, axis = plt.subplots(figsize=(10, 6.5), dpi=180, constrained_layout=True)
     figure.patch.set_facecolor("#071426")
     axis.set_facecolor("#0b1c31")
     colors = [MODEL_COLORS[label] for label in metric_frame["label"]]

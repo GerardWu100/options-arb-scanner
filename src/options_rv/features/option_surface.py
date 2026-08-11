@@ -140,7 +140,9 @@ def _build_feature_row_for_day(
     # Downside skew is defined as below-spot put IV minus ATM put IV at roughly
     # 30 DTE. This keeps the sign and interpretation stable.
     downside_put_iv_30d = _below_spot_put_mid_iv(slice_frame=atm_30_slice)
-    atm_put_iv_30d = _mid_iv_at_closest_strike(slice_frame=atm_30_slice, option_type="p")
+    atm_put_iv_30d = _mid_iv_at_closest_strike(
+        slice_frame=atm_30_slice, option_type="p"
+    )
     downside_skew_30d = np.nan
     if (
         np.isfinite(downside_put_iv_30d)

@@ -34,8 +34,12 @@ def main() -> None:
     parser.add_argument("--symbol", type=str, default="SPY")
     parser.add_argument("--start-date", type=str, default="2024-01-01")
     parser.add_argument("--end-date", type=str, default="2025-12-31")
-    parser.add_argument("--host", type=str, default=os.environ.get("CLICKHOUSE_HOST", "localhost"))
-    parser.add_argument("--port", type=int, default=int(os.environ.get("CLICKHOUSE_PORT", "8123")))
+    parser.add_argument(
+        "--host", type=str, default=os.environ.get("CLICKHOUSE_HOST", "localhost")
+    )
+    parser.add_argument(
+        "--port", type=int, default=int(os.environ.get("CLICKHOUSE_PORT", "8123"))
+    )
     parser.add_argument(
         "--username",
         type=str,

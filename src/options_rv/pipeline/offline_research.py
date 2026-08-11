@@ -27,7 +27,6 @@ from options_rv.models.baselines import (
 from options_rv.models.train import train_ridge_regression
 from options_rv.targets.realized_variance import build_forward_realized_variance_target
 
-
 FEATURE_COLUMNS: list[str] = [
     "atm_iv_30d",
     "term_slope_60d_minus_30d",

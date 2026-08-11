@@ -13,10 +13,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-
-from options_rv.io.local_loader import RawDataValidationError
-from options_rv.io.local_loader import load_raw_data
-
+from options_rv.io.local_loader import RawDataValidationError, load_raw_data
 
 REQUIRED_OPTIONS_COLUMNS: list[str] = [
     "symbol",
@@ -79,12 +76,12 @@ def _write_valid_raw_bundle(raw_dir: Path) -> None:
         "date_coverage": {"start": "2025-01-02", "end": "2025-01-03"},
         "files": {
             "options_quotes.parquet": {
-                "rows": int(len(options_quotes)),
+                "rows": len(options_quotes),
                 "columns": REQUIRED_OPTIONS_COLUMNS,
                 "compression": "zstd",
             },
             "underlying_daily.parquet": {
-                "rows": int(len(underlying_daily)),
+                "rows": len(underlying_daily),
                 "columns": REQUIRED_UNDERLYING_COLUMNS,
                 "compression": "zstd",
             },
@@ -163,6 +160,6 @@ def test_local_loader_module_does_not_import_clickhouse(
 
     monkeypatch.setattr(builtins, "__import__", guarded_import)
 
-    import options_rv.io.local_loader as local_loader
+    from options_rv.io import local_loader
 
     importlib.reload(local_loader)
