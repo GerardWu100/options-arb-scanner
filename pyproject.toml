@@ -3,7 +3,7 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "options-rv"
+name = "options-arb-scanner"
 version = "0.1.0"
 description = "Offline options to realized variance research pipeline"
 requires-python = ">=3.13"
