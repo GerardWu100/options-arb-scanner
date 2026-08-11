@@ -541,13 +541,13 @@ it and positive above it. Using the logarithm makes a strike 5&nbsp;per&nbsp;cen
 5&nbsp;per&nbsp;cent above spot roughly symmetric around zero.</p></div>
 
 <div class="box def"><span class="k">The five option features</span>
-<p>$$\text{atm\_iv\_30d}_t=\operatorname{mean}\Big\{\sigma^{\text{mid}}_i \;:\; i \in D_{30},\;
+<p>$$\mathrm{atm\_iv\_30d}_t=\operatorname{mean}\Big\{\sigma^{\text{mid}}_i \;:\; i \in D_{30},\;
 |\ell_i|=\min_{j\in D_{30}}|\ell_j|\Big\}$$
-$$\text{term\_slope}_t=\text{atm\_iv}_t(D_{60})-\text{atm\_iv}_t(D_{30})$$
-$$\text{downside\_skew}_t=\sigma^{\text{mid}}_{p^{-}}-\sigma^{\text{mid}}_{p^{0}}$$
-$$\text{avg\_spread\_ratio}_t=\frac{1}{n_t}\sum_{i=1}^{n_t}\frac{a_i-b_i}{m_i}
+$$\mathrm{term\_slope}_t=\mathrm{atm\_iv}_t(D_{60})-\mathrm{atm\_iv}_t(D_{30})$$
+$$\mathrm{downside\_skew}_t=\sigma^{\text{mid}}_{p^{-}}-\sigma^{\text{mid}}_{p^{0}}$$
+$$\mathrm{avg\_spread\_ratio}_t=\frac{1}{n_t}\sum_{i=1}^{n_t}\frac{a_i-b_i}{m_i}
 \qquad
-\text{total\_oi}_t=\sum_{i=1}^{n_t}\text{OI}_i$$</p>
+\mathrm{total\_oi}_t=\sum_{i=1}^{n_t}\text{OI}_i$$</p>
 <p class="fnote">$D_{30}$ is the set of quotes on day $t$ whose days-to-expiry is closest to 30;
 $D_{60}$ the same for 60. Both are picked from whatever expiries exist that day, so "30-day" means
 "nearest available to 30 days", not exactly 30. $p^{0}$ is the put whose strike is closest to
@@ -694,7 +694,7 @@ def compute_atm_iv_baseline(feature_target_frame: pd.DataFrame) -&gt; pd.Series:
 <div class="box def"><span class="k">The formulas</span>
 <p>$$f^{\text{persistence}}_t=\text{trailing}RV^{\text{ann}}_t
 \qquad
-f^{\text{atm}}_t=\left(\text{atm\_iv\_30d}_t\right)^2$$</p>
+f^{\text{atm}}_t=\left(\mathrm{atm\_iv\_30d}_t\right)^2$$</p>
 <p class="fnote">$f_t$ is a forecast of annualized variance for the window starting after day $t$.
 The persistence forecast simply reuses the trailing 20-day annualized variance. The second
 converts an implied volatility, which is quoted as an annualized standard deviation, into an
@@ -993,8 +993,8 @@ range. <b>Output:</b> the two Parquet files plus a regenerated <code>manifest.js
 <b>Role:</b> refills the offline cache. Requires network access and credentials.</p></div>
 
 <div class="box def"><span class="k">The filter the query applies at the source</span>
-<p>$$7\;\le\;\text{expiry\_date}-\text{trade\_date}\;\le\;90\ \text{calendar days},
-\qquad \text{expiry\_date} \gt \text{trade\_date}$$</p>
+<p>$$7\;\le\;\mathrm{expiry\_date}-\mathrm{trade\_date}\;\le\;90\ \text{calendar days},
+\qquad \mathrm{expiry\_date} \gt \mathrm{trade\_date}$$</p>
 <p class="fnote">This is what keeps the exported file small. It also means the 60-day feature is
 always available while anything longer dated never is, which quietly fixes the shape of the term
 structure the features can see.</p></div>
