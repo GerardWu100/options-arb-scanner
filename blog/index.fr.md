@@ -8,15 +8,15 @@ categories: ["Quantitative Research", "Risk Management"]
 
 # Une surface d'options peut-elle prévoir la variance réalisée ?
 
-Le dépôt s'appelle `options-arb-scanner`, mais son code actuel ne recherche pas d'arbitrage. Il résume une chaîne d'options SPY de fin de séance en six variables, puis cherche à prévoir la variance réalisée annualisée des cinq séances suivantes.
+Le dépôt s'appelle `options-arb-scanner`, mais son code actuel ne recherche pas d'arbitrage. Il résume une chaîne d'options SPY de fin de séance en six variables et cherche à prévoir la variance réalisée annualisée des cinq séances suivantes.
 
-Ce sont deux sujets de recherche distincts. Un scanner de valeur relative confronte des prix d'options exécutables à des relations d'absence d'arbitrage ou à un modèle de valorisation, puis tient compte des coûts de transaction et de la couverture. Ici, le modèle produit une prévision statistique de variance. Il ne propose ni trade ni profit garanti.
+Ce sont deux sujets de recherche distincts. Un scanner de valeur relative confronte des prix d'options exécutables à des relations d'absence d'arbitrage ou à un modèle de valorisation. Il doit ensuite tenir compte des coûts de transaction et de la couverture. Ici, le modèle produit une prévision statistique de variance. Il ne propose ni trade ni profit garanti.
 
-La différence s'est révélée plus que rédactionnelle lors d'un second audit. La première version de la cible comportait un décalage d'un jour : la fenêtre glissante pouvait inclure le rendement se terminant à la date des variables. Le test unitaire, construit avec des rendements constants, ne pouvait pas repérer l'erreur puisque toutes les fenêtres avaient la même valeur. Un calcul manuel avec des rendements différents l'a mise en évidence. Le pipeline corrigé purge aussi les cibles qui se chevauchent aux frontières des échantillons et écarte les cotations individuellement invalides.
+La différence a compté lors d'un second audit. La première version de la cible comportait un décalage d'un jour. La fenêtre glissante pouvait inclure le rendement se terminant à la date des variables. Le test unitaire, construit avec des rendements constants, ne pouvait pas repérer l'erreur puisque toutes les fenêtres avaient la même valeur. Un calcul manuel avec des rendements différents l'a mise en évidence. Le pipeline corrigé purge aussi les cibles qui se chevauchent aux frontières des échantillons et écarte les cotations individuellement invalides.
 
 ![Une surface d'options stylisée qui se prolonge en prévision incertaine de variance réalisée](images/cover-options-rv.png)
 
-L'échantillon versionné contient 522 jours ouvrés du 2 janvier 2024 au 31 décembre 2025 et 20 880 cotations d'options synthétiques. Il s'agit de données de test déterministes. Les résultats ci-dessous testent le pipeline de recherche, pas le marché réel des options SPY.
+L'échantillon versionné contient 522 jours ouvrés du 2 janvier 2024 au 31 décembre 2025 et 20 880 cotations d'options synthétiques. Il s'agit de données de test déterministes. J'utilise les résultats pour tester le pipeline de recherche, pas pour décrire le marché réel des options SPY.
 
 ## Définir la quantité avant de la prévoir
 
@@ -164,7 +164,7 @@ L'axe vertical logarithmique est nécessaire. La volatilité quotidienne des ren
 
 Le second graphique livre deux informations. Le benchmark de volatilité implicite a les bonnes unités mais une calibration économique incohérente. Ridge reste proche de la persistance en MAE, sans la battre, et se comporte beaucoup moins bien selon QLIKE. Rien dans ces résultats ne permet d'affirmer que les variables d'options améliorent la prévision de variance de SPY.
 
-## Ce que l'expérience établit, et ce qu'elle n'établit pas
+## Ce que l'expérience établit
 
 La nouvelle exécution, les 18 tests unitaires et l'exécution non interactive du notebook confirment que le chargeur hors ligne, la cible corrigée, les filtres de cotations, la séparation purgée, le modèle, les métriques et les graphiques fonctionnent ensemble. Les fichiers CSV figés dans `blog/data/` reproduisent chaque valeur de test tracée.
 
@@ -172,7 +172,7 @@ Ils ne démontrent aucune prévisibilité de marché. Une étude en données ré
 
 La comparaison des prévisions demande aussi une mesure d'incertitude adaptée au chevauchement des horizons. Un test de Diebold-Mariano, proposé par [Diebold et Mariano (1995)](https://doi.org/10.1080/07350015.1995.10524599), nécessiterait ici une estimation de variance de long terme qui tienne compte de ce chevauchement. La valeur économique exigerait un trade de variance précisément défini et tous ses coûts d'exécution.
 
-La conclusion corrigée est étroite, mais utile : ce dépôt fournit maintenant une ossature plus propre pour prévoir la variance. Sur ces données synthétiques, la persistance gagne. Le projet ne dit encore rien sur un arbitrage ni sur un avantage exploitable.
+Ma conclusion est étroite. Ce dépôt permet maintenant une expérience de prévision de variance plus propre. Sur ces données synthétiques, la persistance gagne. Le résultat ne dit rien sur un arbitrage ni sur un avantage exploitable.
 
 ## Références
 

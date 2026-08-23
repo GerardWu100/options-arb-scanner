@@ -6,17 +6,17 @@ image: images/cover-options-rv.png
 categories: ["Quantitative Research", "Risk Management"]
 ---
 
-# Can an Option Surface Forecast Realized Variance?
+# Can an option surface forecast realized variance?
 
 The repository is called `options-arb-scanner`, but the current code does not scan for arbitrage. It compresses an end-of-day SPY option chain into six features and asks whether they forecast annualized realized variance over the next five trading days.
 
-Those are different research problems. A relative-value scanner compares executable option prices against no-arbitrage relationships or a pricing model, then accounts for transaction costs and hedge execution. This project fits a statistical forecast. Its output is a variance estimate, not a trade or a guaranteed profit.
+Those are different research problems. A relative-value scanner compares executable option prices with no-arbitrage relationships or a pricing model. It must then account for transaction costs and hedge execution. This project fits a statistical forecast. Its output is a variance estimate, not a trade or a guaranteed profit.
 
-The distinction became more than editorial during a second audit. The original target implementation had an off-by-one error: its rolling operation could include the return ending on the feature date. A constant-return unit test passed because every possible window had the same value. A non-constant hand example exposed the defect. The corrected pipeline also purges overlapping labels at split boundaries and rejects individually invalid quotes.
+The distinction mattered during a second audit. The original target implementation had an off-by-one error. Its rolling operation could include the return ending on the feature date. A constant-return unit test passed because every possible window had the same value. A non-constant hand example exposed the defect. The corrected pipeline also purges overlapping labels at split boundaries and rejects individually invalid quotes.
 
 ![A stylized option surface flowing into an uncertain realized-variance forecast](images/cover-options-rv.png)
 
-The committed sample contains 522 business-day rows from 2 January 2024 through 31 December 2025 and 20,880 synthetic option quotes. It is deterministic test data. The results below test the research pipeline, not the live SPY options market.
+The committed sample contains 522 business-day rows from 2 January 2024 through 31 December 2025 and 20,880 synthetic option quotes. It is deterministic test data. I use the results to test the research pipeline, not to describe the live SPY options market.
 
 ## Define the quantity before forecasting it
 
@@ -164,7 +164,7 @@ The logarithmic vertical axis is necessary. The synthetic underlying has daily r
 
 The second chart makes two points. The implied-volatility benchmark is dimensionally correct but economically uncalibrated. Ridge stays close to persistence on MAE, yet fails to beat it and performs much worse on QLIKE. Nothing here supports a claim that option features improve SPY variance forecasts.
 
-## What the experiment can and cannot establish
+## What the experiment establishes
 
 The fresh run, 18 unit tests, and non-interactive notebook execution establish that the offline loader, corrected target, quote filters, purged split, model, metrics, and charts work together. The frozen CSV files under `blog/data/` reproduce every plotted test value.
 
@@ -172,7 +172,7 @@ They do not establish market predictability. A live study still needs exchange-s
 
 Forecast comparisons also need uncertainty estimates that respect overlapping horizons. A Diebold-Mariano test, introduced by [Diebold and Mariano (1995)](https://doi.org/10.1080/07350015.1995.10524599), would require an overlap-aware long-run variance estimate here. Economic value would require a specified variance trade and all execution costs.
 
-The corrected conclusion is narrow and useful: this repository is now a cleaner variance-forecasting scaffold. Its synthetic benchmark result says persistence wins this fixture. It says nothing yet about arbitrage or a tradeable edge.
+My conclusion is narrow. This repository now supports a cleaner variance-forecasting experiment. Persistence wins on this synthetic fixture. The result says nothing about arbitrage or a tradeable edge.
 
 ## References
 
