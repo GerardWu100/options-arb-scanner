@@ -110,7 +110,3 @@ The pipeline writes to the `--output-dir` you pass (for example
 `outputs/demo_run/`): CSV/Parquet evaluation tables for the baselines and
 ridge model, a ridge coefficient table, and PNG figures. No HTML, dashboard,
 or frontend artifacts are produced.
-
-## License
-
-All rights reserved. See [LICENSE](LICENSE).
